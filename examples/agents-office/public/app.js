@@ -171,6 +171,7 @@ function renderRuntime() {
   const live = state.runtime.live;
   chip.className = `mode-chip ${live ? 'live' : 'demo'}`;
   el('modeText').textContent = live ? 'система работает' : 'демо-режим — нет ключа';
+  if (state.runtime.shop) el('shopName').textContent = state.runtime.shop;
   setMetric('mModel', live ? state.runtime.model : 'демо');
 
   const byStatus = state.stats.byStatus || {};

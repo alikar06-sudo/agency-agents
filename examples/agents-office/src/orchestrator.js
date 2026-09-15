@@ -110,6 +110,7 @@ export class Orchestrator {
       events: this.store.recentEvents(60),
       stats: this.store.stats(this.agents),
       runtime: {
+        shop: process.env.AO_SHOP || 'Vitaflow · американские витамины',
         model: modelName,
         live: hasApiKey(),
         concurrency: CONCURRENCY,
