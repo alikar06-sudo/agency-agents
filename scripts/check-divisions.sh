@@ -52,7 +52,10 @@ canonical() {
 # produce a false failure.
 actual_dirs() {
   local base
-  git ls-files | awk -F/ 'NF>1{print $1}' | sort -u | while IFS= read -r base; do
+  # core.quotePath=false: by default git wraps any path with non-ASCII bytes in
+  # quotes and octal-escapes it, so the first field comes back as `"examples`
+  # and never matches the exclude list — a bogus "unknown division" failure.
+  git -c core.quotePath=false ls-files | awk -F/ 'NF>1{print $1}' | sort -u | while IFS= read -r base; do
     [[ "$base" == .* ]] && continue
     case " ${NON_DIVISION_DIRS[*]} " in *" $base "*) continue ;; esac
     echo "$base"
