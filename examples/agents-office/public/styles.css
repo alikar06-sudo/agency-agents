@@ -254,6 +254,47 @@ kbd {
 .fig { animation: bob 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 .fig.busy-now { animation-duration: 0.85s; }
 
+/* --- руки, пальцы и кофе-брейк --- */
+/* Пальцы стучат только у занятых: в простое анимации выключены, и десятки
+   рабочих мест не жгут процессор впустую. */
+@keyframes tap { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-1.2px); } }
+@keyframes handbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.5px); } }
+.fig.busy-now .fin { animation: tap 0.38s ease-in-out infinite; }
+.fig.busy-now .hand { animation: handbob 0.76s ease-in-out infinite; }
+
+/* Глоток: рука с кружкой поднимается к голове, рука с клавиатуры убирается. */
+.arm-sip { opacity: 0; transition: opacity 0.2s ease; }
+.fig.sipping .arm-sip { opacity: 1; }
+.fig.sipping .arm-r { opacity: 0; }
+.fig.sipping .fin { animation: none; }
+.desk:has(.fig.sipping) .deskmug { opacity: 0; }
+.deskmug { transition: opacity 0.25s ease; }
+.head { transition: transform 0.35s ease; transform-box: fill-box; transform-origin: bottom center; }
+.fig.sipping .head { transform: translate(1px, -1px) rotate(-7deg); }
+
+/* --- бар, кухня и дроны --- */
+@keyframes rotor { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.16); } }
+@keyframes drone-hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.4px); } }
+@keyframes steam { 0% { transform: translateY(0) scale(0.6); opacity: 0.4; } 100% { transform: translateY(-16px) scale(1.5); opacity: 0; } }
+@keyframes pad { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
+@keyframes pop { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes holo { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+
+.rotor { animation: rotor 0.14s linear infinite; transform-box: fill-box; transform-origin: center; }
+.drone-body { animation: drone-hover 1.7s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.drone .eye { animation: pad 1.3s ease-in-out infinite; }
+.steam circle { animation: steam 2.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.pad { animation: pad 2.2s ease-in-out infinite; }
+.fridge { animation: pad 4s ease-in-out infinite; }
+.treat .pop { animation: pop 0.4s cubic-bezier(0.34, 1.6, 0.64, 1); transform-box: fill-box; transform-origin: bottom center; }
+.holo { animation: holo 2.8s ease-in-out infinite; }
+
+/* Бар и подиумы начальства не гаснут при фокусе на отделе — иначе офис
+   распадается на куски и теряется ощущение одного помещения. */
+.world.focused .plate.lounge { opacity: 0.55; }
+.atag.exec { border-color: rgba(201, 161, 74, 0.7); box-shadow: 0 0 0 1px rgba(201, 161, 74, 0.18); }
+.bar-label b { color: #F0C980; }
+
 /* --- элементы поверх сцены --- */
 .focusbar[hidden] { display: none !important; }
 .focusbar {
