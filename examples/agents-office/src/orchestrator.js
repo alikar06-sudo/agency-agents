@@ -4,10 +4,11 @@ import { runAgent, routeTask, hasApiKey, modelName } from './llm.js';
 const CONCURRENCY = Number(process.env.AO_CONCURRENCY || 2);
 
 export class Orchestrator {
-  constructor({ store, agents, getContext }) {
+  constructor({ store, agents, getContext, getCatalog }) {
     this.store = store;
     this.agents = agents;
     this.getContext = getContext;
+    this.getCatalog = getCatalog;
     this.queue = [];
     this.running = 0;
   }
@@ -83,16 +84,22 @@ export class Orchestrator {
 
       let buffer = '';
       let lastPush = 0;
+      const tools = [];
       const result = await runAgent({
         agent,
         task,
         context: this.getContext(agent),
+        catalog: this.getCatalog?.(),
         onText: (delta) => {
           buffer += delta;
           const now = Date.now();
           if (now - lastPush < 250) return;   // не чаще четырёх раз в секунду
           lastPush = now;
-          this.store.progress(taskId, buffer);
+          this.store.progress(taskId, buffer, tools);
+        },
+        onTool: (label) => {
+          tools.push(label);
+          this.store.progress(taskId, buffer, tools);
         },
       });
 
@@ -103,6 +110,8 @@ export class Orchestrator {
           output: result.text,
           partial: '',
           usage: result.usage,
+          steps: result.steps,
+          tools,
           mock: result.mock,
           finishedAt: new Date().toISOString(),
         },
@@ -123,6 +132,7 @@ export class Orchestrator {
       tasks: this.store.listTasks(),
       events: this.store.recentEvents(60),
       stats: this.store.stats(this.agents),
+      catalog: this.getCatalog?.()?.stats() || null,
       runtime: {
         shop: process.env.AO_SHOP || 'Vitaflow · американские витамины',
         model: modelName,

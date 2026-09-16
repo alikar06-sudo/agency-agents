@@ -107,13 +107,14 @@ export class Store {
   }
 
   /** Прогресс печати: обновляем в памяти и шлём лёгкое событие без записи на диск. */
-  progress(id, partial) {
+  progress(id, partial, tools = []) {
     const task = this.tasks.get(id);
     if (!task) return;
     task.partial = partial;
+    task.tools = tools;
     for (const fn of this.listeners) {
       try {
-        fn({ type: 'task.progress', ts: new Date().toISOString(), taskId: id, agentId: task.agentId, partial });
+        fn({ type: 'task.progress', ts: new Date().toISOString(), taskId: id, agentId: task.agentId, partial, tools });
       } catch (err) { console.error('[store] подписчик упал:', err.message); }
     }
   }
