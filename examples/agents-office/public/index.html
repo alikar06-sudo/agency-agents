@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Agents Office</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -13,17 +14,23 @@
 
 <header class="topbar">
   <div class="brand">
-    <b>AGENTS OFFICE</b><span class="ver">v1</span>
+    <span class="mark"></span>
+    <b>AGENTS OFFICE</b>
     <span class="shop" id="shopName">…</span>
   </div>
-  <div class="conn">
-    <span class="conn-label">подключения</span>
-    <span class="slot" id="slotModel" title="Модель">ai</span>
-    <span class="slot" title="Telegram — не подключено">tg</span>
-    <span class="slot" title="База заказов — не подключено">db</span>
-    <span class="slot" title="Instagram — не подключено">ig</span>
+
+  <div class="kpis" id="kpis">
+    <div class="kpi"><b id="kAgents">—</b><span>агентов</span></div>
+    <div class="kpi"><b id="kCatalog">—</b><span>в каталоге</span></div>
+    <div class="kpi"><b id="kStock">—</b><span>в наличии</span></div>
+    <div class="kpi hot" id="kWaitBox"><b id="kWait">0</b><span>ждут решения</span></div>
+    <div class="kpi"><b id="kBusy">0</b><span>сейчас пишут</span></div>
   </div>
+
   <div class="topbar-right">
+    <button class="cmd-hint" id="cmdOpen" title="Быстрая задача">
+      <span>задача</span><kbd>⌘K</kbd>
+    </button>
     <span class="chip" id="modeChip"><i></i><span id="modeText">подключение…</span></span>
     <span class="clock" id="clock">--:--:--</span>
   </div>
@@ -32,7 +39,7 @@
 <div class="stage">
   <div class="viewport" id="viewport">
     <div class="world" id="world">
-      <svg id="scene" width="2800" height="1700" aria-label="Схема офиса"></svg>
+      <svg id="scene" width="3000" height="1900" aria-label="Схема офиса"></svg>
       <div id="sceneOverlay"></div>
     </div>
 
@@ -41,24 +48,28 @@
       <span class="crumb" id="crumb"></span>
     </div>
 
-    <!-- экран сотрудника, к которому подлетели -->
     <section class="agent-panel" id="agentPanel" hidden>
       <header>
-        <div>
+        <div class="ap-id">
           <div class="ap-name">—</div>
           <div class="ap-role">—</div>
         </div>
         <span class="ap-status">—</span>
       </header>
+      <div class="ap-meta">—</div>
       <div class="ap-taskline">задача: <span class="ap-task">—</span></div>
+      <div class="ap-tools" hidden></div>
       <pre class="ap-text"></pre>
     </section>
 
-    <p class="hint">тяните — двигать · колесо или щипок — масштаб · клик по сотруднику — подлететь к его экрану</p>
+    <div class="minimap" id="minimap" title="Мини-карта офиса"></div>
+
+    <p class="hint">тяните — двигать · колесо — масштаб · клик по сотруднику — его экран · ←→ следующий · Esc — весь офис</p>
+
     <div class="zoom">
       <button id="zIn" aria-label="Приблизить">+</button>
       <button id="zOut" aria-label="Отдалить">−</button>
-      <button id="zFit" aria-label="Вся схема" title="Вся схема">⌂</button>
+      <button id="zFit" aria-label="Весь офис" title="Весь офис">⌂</button>
     </div>
   </div>
 
@@ -84,6 +95,15 @@
       </form>
     </div>
   </aside>
+</div>
+
+<!-- быстрый ввод задачи -->
+<div class="palette" id="palette" hidden>
+  <div class="palette-box" role="dialog" aria-modal="true" aria-label="Быстрая задача">
+    <input id="pQuery" type="text" placeholder="Что нужно сделать? Агента подберём сами" autocomplete="off">
+    <div class="palette-list" id="pList"></div>
+    <div class="palette-foot"><kbd>↑↓</kbd> выбрать · <kbd>Enter</kbd> в работу · <kbd>Esc</kbd> закрыть</div>
+  </div>
 </div>
 
 <div class="overlay" id="overlay" hidden>
