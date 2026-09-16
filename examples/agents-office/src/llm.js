@@ -82,9 +82,66 @@ export const TOOLS = [
   },
 ];
 
+/* Инструменты по заказам подключаются, только если магазин отдаёт заказы:
+   агенту незачем видеть кнопку, за которой пусто. */
+export const ORDER_TOOLS = [
+  {
+    name: 'orders_search',
+    description:
+      'Заказы магазина: статус, сумма, город, состав. Только чтение — менять заказ нельзя. ' +
+      'Телефоны покупателей инструмент не отдаёт и вставлять их в ответ нельзя.',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      additionalProperties: false,
+      required: [],
+      properties: {
+        статус: { type: 'string', description: 'Например «новый», «собран», «доставлен». Пусто — любые.' },
+        город: { type: 'string', description: 'Ограничить городом. Пусто — не ограничивать.' },
+        покупатель: { type: 'string', description: 'Имя покупателя. Пусто — не ограничивать.' },
+        сколько: { type: 'integer', description: 'Сколько заказов вернуть, 1–30.' },
+      },
+    },
+  },
+  {
+    name: 'orders_get',
+    description: 'Один заказ целиком по его номеру.',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id'],
+      properties: { id: { type: 'string', description: 'Номер заказа.' } },
+    },
+  },
+];
+
+/** Инструменты, которые реально есть чем обслужить. */
+export function toolsFor(catalog, orders) {
+  const list = [];
+  if (catalog?.size) list.push(...TOOLS);
+  if (orders?.size) list.push(...ORDER_TOOLS);
+  return list.length ? list : undefined;
+}
+
 /** Выполняет вызов инструмента. Ошибку возвращаем текстом — модель её прочитает. */
-export function runTool(catalog, name, input) {
+export function runTool(catalog, name, input, orders = null) {
   try {
+    if (name === 'orders_search') {
+      if (!orders?.size) return 'Заказы в систему не подключены — ответь, что этих данных у тебя нет.';
+      const found = orders.search({
+        статус: input.статус || '',
+        город: input.город || '',
+        покупатель: input.покупатель || '',
+        сколько: Number(input.сколько) || 10,
+      });
+      if (!found.length) return 'Заказов под такие условия нет.';
+      return found.map((x) => orders.card(x)).join('\n\n═══\n\n');
+    }
+    if (name === 'orders_get') {
+      if (!orders?.size) return 'Заказы в систему не подключены.';
+      return orders.card(orders.get(input.id));
+    }
     if (name === 'catalog_search') {
       const found = catalog.search({
         запрос: input.запрос || '',
@@ -125,7 +182,7 @@ async function mockRun(agent, task, onText) {
 
 /* ---------------- основной вызов ---------------- */
 
-export async function runAgent({ agent, task, context, catalog, onText, onTool }) {
+export async function runAgent({ agent, task, context, catalog, orders, onText, onTool }) {
   if (!hasApiKey()) return mockRun(agent, task, onText);
 
   const system = buildSystem(agent, context);
@@ -147,7 +204,7 @@ export async function runAgent({ agent, task, context, catalog, onText, onTool }
       // Порядок префикса: tools → system → messages, поэтому набор инструментов
       // обязан оставаться неизменным, иначе кэш промахнётся.
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-      tools: catalog?.size ? TOOLS : undefined,
+      tools: toolsFor(catalog, orders),
       messages,
     });
     if (onText) stream.on('text', (delta) => onText(delta));
@@ -180,7 +237,7 @@ export async function runAgent({ agent, task, context, catalog, onText, onTool }
       results.push({
         type: 'tool_result',
         tool_use_id: call.id,
-        content: runTool(catalog, call.name, call.input || {}),
+        content: runTool(catalog, call.name, call.input || {}, orders),
       });
     }
     messages.push({ role: 'user', content: results });

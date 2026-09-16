@@ -574,3 +574,9 @@ button.mini.ghost:hover { color: var(--text); border-color: #2E4470; }
 @media (max-width: 980px) {
   .embed .stage { grid-template-rows: 52% 48%; }
 }
+
+/* Отправка покупателю — действие, после которого текст уходит живому человеку,
+   поэтому кнопка выделена и не теряется среди «скопировать» и «закрыть». */
+.mini.send { background: #1E5F3F; border-color: #2E8257; color: #D6F5E4; }
+.mini.send:hover:not(:disabled) { background: #26764E; }
+.mini.send:disabled { opacity: 0.6; cursor: default; }

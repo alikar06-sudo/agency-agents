@@ -205,6 +205,7 @@ function showTask(id, keep = false) {
   if (t.round > 1) bits.push(`${t.round}-я версия`);
   if (t.review) bits.push(t.review.verdict === 'ok' ? 'управляющий принял' : 'после доработки');
   if (t.cost) bits.push('$' + t.cost.toFixed(3));
+  if (t.sent) bits.push('отправлено покупателю');
   if (t.mock) bits.push('демо');
   el('sheetKicker').textContent = bits.join(' · ');
   el('sheetTitle').textContent = t.title;
@@ -223,10 +224,33 @@ function showTask(id, keep = false) {
     acts.push(`<button class="mini ok" data-retry="${t.id}">Запустить заново</button>`);
   }
   if (t.output) acts.push('<button class="mini ghost" data-copy="1">Скопировать</button>');
+  /* Отправка появляется только у принятой работы и только когда бот подключён:
+     кнопка, которая не может сработать, хуже отсутствующей. */
+  if (t.output && state.runtime.telegram && t.review?.verdict !== 'rework') {
+    acts.push(`<button class="mini send" data-send="${t.id}">${t.sent ? 'Отправить ещё раз' : 'Отправить покупателю'}</button>`);
+  }
   acts.push('<button class="mini ghost" data-close="1">Закрыть</button>');
   el('sheetActs').innerHTML = acts.join('');
   bind(el('sheetActs'));
   el('sheetActs').querySelector('[data-close]').addEventListener('click', closeSheet);
+  el('sheetActs').querySelector('[data-send]')?.addEventListener('click', async (e) => {
+    const chatId = prompt('Кому отправить? Telegram chat id покупателя:', t.sent?.chatId || '');
+    if (chatId === null || !chatId.trim()) return;
+    e.target.disabled = true;
+    e.target.textContent = 'Отправляю…';
+    try {
+      const out = await api('/api/send', {
+        method: 'POST',
+        body: JSON.stringify({ taskId: t.id, chatId: chatId.trim() }),
+      });
+      e.target.textContent = `Отправлено (${out.parts} сообщ.)`;
+      refresh();
+    } catch (err) {
+      e.target.disabled = false;
+      e.target.textContent = 'Отправить покупателю';
+      alert('Не отправилось: ' + err.message);
+    }
+  });
   el('sheetActs').querySelector('[data-copy]')?.addEventListener('click', async (e) => {
     try {
       await navigator.clipboard.writeText(t.output);

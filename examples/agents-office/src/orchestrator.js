@@ -5,11 +5,12 @@ import { review, reviewEnabled, reviewRounds } from './review.js';
 const CONCURRENCY = Number(process.env.AO_CONCURRENCY || 2);
 
 export class Orchestrator {
-  constructor({ store, agents, getContext, getCatalog }) {
+  constructor({ store, agents, getContext, getCatalog, getOrders }) {
     this.store = store;
     this.agents = agents;
     this.getContext = getContext;
     this.getCatalog = getCatalog;
+    this.getOrders = getOrders;
     this.queue = [];
     this.running = 0;
   }
@@ -109,6 +110,7 @@ export class Orchestrator {
           task: taskForRun,
           context: this.getContext(agent),
           catalog: this.getCatalog?.(),
+          orders: this.getOrders?.(),
           onText: (delta) => {
             buffer += delta;
             const now = Date.now();
@@ -172,6 +174,7 @@ export class Orchestrator {
       events: this.store.recentEvents(60),
       stats: this.store.stats(this.agents),
       catalog: this.getCatalog?.()?.stats() || null,
+      orders: this.getOrders?.()?.stats() || null,
       spend: [...this.store.tasks.values()].reduce((sum, t) => sum + (t.cost || 0), 0),
       runtime: {
         shop: process.env.AO_SHOP || 'Vitaflow · американские витамины',

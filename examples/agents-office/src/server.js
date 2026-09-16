@@ -8,6 +8,9 @@ import { Store } from './store.js';
 import { loadAgents, loadKnowledge, composeContext } from './registry.js';
 import { Catalog } from './catalog.js';
 import { Orchestrator } from './orchestrator.js';
+import { Orders } from './orders.js';
+import { Scheduler, loadSchedule } from './schedule.js';
+import { sendMessage, hasTelegram, whoAmI } from './telegram.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, '..');
@@ -42,6 +45,12 @@ const CATALOG_URL = (process.env.AO_CATALOG_URL || '').trim();
 const CATALOG_TOKEN = (process.env.AO_CATALOG_TOKEN || '').trim();
 const CATALOG_REFRESH = Math.max(20, Number(process.env.AO_CATALOG_REFRESH_SEC || 120)) * 1000;
 
+/* Заказы — тоже только на чтение. Без адреса агенты честно говорят, что
+   заказов не видят, вместо того чтобы их выдумывать. */
+const ORDERS_URL = (process.env.AO_ORDERS_URL || '').trim();
+const ORDERS_TOKEN = (process.env.AO_ORDERS_TOKEN || '').trim();
+const ORDERS_REFRESH = Math.max(20, Number(process.env.AO_ORDERS_REFRESH_SEC || 60)) * 1000;
+
 const store = new Store();
 const agents = loadAgents(ROOT);
 if (!agents.length) {
@@ -50,10 +59,13 @@ if (!agents.length) {
 }
 let knowledge = loadKnowledge(ROOT);
 let catalog = Catalog.fromFile(knowledge.dir);
+let orders = new Orders();
+const schedule = loadSchedule(knowledge.dir);
 const orchestrator = new Orchestrator({
   store, agents,
   getContext: (agent) => composeContext(knowledge, agent, catalog),
   getCatalog: () => catalog,
+  getOrders: () => orders,
 });
 
 /* Тянем каталог из магазина. Неудача не должна обнулять ассортимент: если
@@ -76,6 +88,27 @@ async function pullCatalog(reason) {
   } catch (err) {
     store.log('catalog.failed', {
       message: `Каталог из магазина не прочитан: ${err.message}. Работаю по последней копии (${catalog.size} позиций).`,
+    });
+    return false;
+  }
+}
+
+let ordersPrint = '';
+async function pullOrders(reason) {
+  if (!ORDERS_URL) return false;
+  try {
+    const fresh = await Orders.fromUrl(ORDERS_URL, ORDERS_TOKEN);
+    const print = fresh.fingerprint();
+    orders = fresh;
+    if (print === ordersPrint) return false;
+    ordersPrint = print;
+    store.log('orders.updated', {
+      message: `Заказы из магазина: ${fresh.size} шт (${reason})`,
+    });
+    return true;
+  } catch (err) {
+    store.log('orders.failed', {
+      message: `Заказы из магазина не прочитаны: ${err.message}. Работаю по последней копии (${orders.size} шт).`,
     });
     return false;
   }
@@ -154,6 +187,8 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/state' && req.method === 'GET') {
       const snapshot = orchestrator.snapshot();
       snapshot.runtime.build = BUILD;
+      snapshot.runtime.telegram = hasTelegram();
+      snapshot.runtime.schedule = schedule.length;
       return json(res, 200, snapshot);
     }
 
@@ -219,10 +254,39 @@ const server = createServer(async (req, res) => {
       knowledge = loadKnowledge(ROOT);
       catalog = Catalog.fromFile(knowledge.dir);
       if (CATALOG_URL) await pullCatalog('кнопка «перечитать знания»');
+      if (ORDERS_URL) await pullOrders('кнопка «перечитать знания»');
       store.log('brain.updated', {
         message: `Пакет знаний перечитан: ${knowledge.files.length} файлов`,
       });
       return json(res, 200, { ok: true, files: knowledge.files, catalog: catalog.stats() });
+    }
+
+    /* Отправка покупателю. Делается только по явному нажатию владельца:
+       автоотправка от имени магазина — слишком дорогая ошибка, чтобы доверить
+       её циклу без человека. Управляющий проверяет, владелец подтверждает. */
+    if (pathname === '/api/send' && req.method === 'POST') {
+      if (!hasTelegram()) return json(res, 400, { error: 'AO_TELEGRAM_TOKEN не задан' });
+      const body = await readBody(req);
+      const task = body.taskId ? store.tasks.get(body.taskId) : null;
+      const text = (body.text ?? task?.output ?? '').trim();
+      if (!text) return json(res, 400, { error: 'Нечего отправлять: текст пуст' });
+      if (task && task.review?.verdict === 'rework') {
+        return json(res, 400, { error: 'Управляющий вернул работу на доработку — сначала исправьте' });
+      }
+      try {
+        const sent = await sendMessage({ chatId: body.chatId, text });
+        if (task) {
+          store.updateTask(task.id, {
+            sent: { at: new Date().toISOString(), chatId: sent.chatId, parts: sent.parts },
+          }, { event: 'task.sent', message: `Отправлено покупателю: ${task.title}` });
+        } else {
+          store.log('task.sent', { message: `Отправлено покупателю (${sent.parts} сообщ.)` });
+        }
+        return json(res, 200, { ok: true, ...sent });
+      } catch (err) {
+        store.log('send.failed', { message: `Не отправилось: ${err.message}` });
+        return json(res, 400, { error: err.message });
+      }
     }
 
     // Чем именно сейчас отвечает сервер — для проверки после выкладки
@@ -230,6 +294,8 @@ const server = createServer(async (req, res) => {
       return json(res, 200, {
         build: BUILD, startedAt: STARTED_AT, agents: agents.length,
         catalogSource: catalog.source, catalogReadAt: catalog.at, catalog: catalog.stats(),
+        ordersSource: orders.source, orders: orders.stats(),
+        telegram: hasTelegram(), schedule: schedule.length,
       });
     }
 
@@ -252,6 +318,8 @@ server.listen(PORT, HOST, () => {
     ? `Знания: ${knowledge.files.length} файлов · каталог ${catalog.size} позиций (${catalog.stats().inStock} в наличии)`
     : 'Знания: папка «знания» не найдена, работаю по BRAIN.md');
   console.log(`Сборка панели: ${BUILD}`);
+  console.log(`Расписание: ${schedule.length ? `${schedule.length} задач` : 'пусто (знания/расписание.json)'}`);
+  console.log(ORDERS_URL ? `Заказы: ${ORDERS_URL.replace(/\?.*$/, '')}` : 'Заказы: не подключены (AO_ORDERS_URL)');
   console.log(CATALOG_URL
     ? `Каталог: живой, ${CATALOG_URL.replace(/\?.*$/, '')}, обновление раз в ${CATALOG_REFRESH / 1000} с`
     : 'Каталог: снимок из «знания» (задайте AO_CATALOG_URL, чтобы читать магазин вживую)');
@@ -264,6 +332,27 @@ server.listen(PORT, HOST, () => {
 if (CATALOG_URL) {
   await pullCatalog('старт');
   setInterval(() => pullCatalog('по расписанию'), CATALOG_REFRESH).unref?.();
+}
+
+if (ORDERS_URL) {
+  await pullOrders('старт');
+  setInterval(() => pullOrders('по расписанию'), ORDERS_REFRESH).unref?.();
+}
+
+new Scheduler({
+  jobs: schedule,
+  log: (type, payload) => store.log(type, payload),
+  onFire: (job) => orchestrator.submit({
+    title: job.title, input: job.input, agentId: job.agentId,
+  }),
+}).start();
+
+/* Показываем владельцу, какой именно бот подключён: перепутанный токен иначе
+   обнаружился бы только после сообщения не тому человеку. */
+if (hasTelegram()) {
+  whoAmI()
+    .then((me) => console.log(`Telegram: отправка через @${me.username}`))
+    .catch((err) => console.error(`Telegram: токен задан, но бот не отвечает — ${err.message}`));
 }
 
 export { server, orchestrator, store, pullCatalog };
