@@ -101,7 +101,7 @@
       gWires.appendChild(wire);
     });
 
-    gPlates.appendChild(buildBrain(c));
+    gPlates.appendChild(this.buildCore(c));
 
     // дальние этажи рисуем первыми — правильное перекрытие
     [...this.layout].sort((a, b) => (a.cx + a.cy) - (b.cx + b.cy))
@@ -190,6 +190,68 @@
     g.appendChild(mk('circle', { cx: c[0], cy: c[1], r: 8, fill: '#FFF', filter: 'url(#glow)' }));
     return g;
   }
+
+  /* ---------- командный центр ---------- */
+
+  /** В середине офиса сидят двое: оркестратор раздаёт задачи,
+      управляющий принимает работу или возвращает её. Над ними — общая память. */
+  Office.buildCore = function (c) {
+    const g = mk('g');
+    const tint = '#8FA8D8';
+    const H = 26;
+
+    const N = proj(-H, -H), E = proj(H, -H), S = proj(H, H), W = proj(-H, H);
+    const down = (p) => [p[0], p[1] + 22];
+    g.appendChild(mk('polygon', { points: pts([E, S, down(S), down(E)]), fill: mixDark(tint, 0.78) }));
+    g.appendChild(mk('polygon', { points: pts([S, W, down(W), down(S)]), fill: mixDark(tint, 0.86) }));
+    g.appendChild(mk('polygon', {
+      points: pts([N, E, S, W]), fill: mixDark(tint, 0.7),
+      stroke: shade(tint, 0.95), 'stroke-width': 1.2, opacity: 0.97,
+    }));
+    g.appendChild(mk('polygon', {
+      points: pts([proj(-H + 4, -H + 4), proj(H - 4, -H + 4), proj(H - 4, H - 4), proj(-H + 4, H - 4)]),
+      fill: mixDark(tint, 0.58), opacity: 0.55,
+    }));
+
+    const label = mk('text', {
+      fill: shade(tint, 1.1), opacity: 0.55,
+      'font-size': 8.5, 'font-family': 'JetBrains Mono, monospace',
+      'letter-spacing': 2, 'font-weight': 700,
+      transform: `translate(${proj(-H + 6, H - 6)[0]} ${proj(-H + 6, H - 6)[1]}) matrix(0.866 0.5 -0.866 0.5 0 0)`,
+    });
+    label.textContent = 'КОМАНДНЫЙ ЦЕНТР';
+    g.appendChild(label);
+
+    g.appendChild(buildBrain(c));
+
+    const CORE = [
+      { id: '__router', name: 'Оркестратор', emoji: '🎛️', color: '#6F8FE8', x: -13, y: -6,
+        description: 'Принимает задачу, выбирает исполнителя, ведёт очередь' },
+      { id: '__reviewer', name: 'Управляющий', emoji: '🧐', color: '#E0A03A', x: 13, y: 8,
+        description: 'Проверяет работу по правилам магазина: принять или вернуть' },
+    ];
+    for (const a of CORE) g.appendChild(this.buildWorkstation(a, a.x, a.y, tint));
+    this.core = CORE;
+
+    return g;
+  };
+
+  /** Сколько задач сейчас у оркестратора и управляющего. */
+  Office.coreStats = function () {
+    const t = this.state.tasks || [];
+    return {
+      __router: {
+        active: t.filter((x) => x.stage === 'routing').length,
+        waiting: 0,
+        done: t.filter((x) => x.agentId).length,
+      },
+      __reviewer: {
+        active: t.filter((x) => x.stage === 'review').length,
+        waiting: t.filter((x) => x.review?.verdict === 'rework').length,
+        done: t.filter((x) => x.review?.verdict === 'ok').length,
+      },
+    };
+  };
 
   /* ---------- этаж отдела ---------- */
 
@@ -420,11 +482,15 @@
   /* ================= обновление данными ================= */
 
   Office.statsOf = function (id) {
+    if (id === '__router' || id === '__reviewer') return this.coreStats()[id];
     return this.state.stats?.byAgent?.[id] || { active: 0, waiting: 0, done: 0 };
   };
 
   Office.taskOf = function (id) {
     const t = this.state.tasks || [];
+    if (id === '__router') return t.find((x) => x.stage === 'routing') || null;
+    if (id === '__reviewer') return t.find((x) => x.stage === 'review')
+      || t.find((x) => x.review) || null;
     return t.find((x) => x.agentId === id && (x.status === 'working' || x.status === 'routing'))
         || t.find((x) => x.agentId === id && x.status === 'waiting_approval')
         || t.find((x) => x.agentId === id) || null;
@@ -460,17 +526,30 @@
          ${s.waiting ? `<div class="card-alert">⚠ ${s.waiting} ${plural(s.waiting, 'ждёт', 'ждут', 'ждут')} решения</div>` : ''}`;
     }
 
-    for (const a of this.agents) {
+    for (const a of [...this.agents, ...(this.core || [])]) {
       const s = this.statsOf(a.id);
       const busy = s.active > 0;
       const mon = this.nodes.monitors[a.id];
+      if (!mon) continue;
       mon.g.querySelector('.fig').classList.toggle('busy-now', busy);
       mon.lines.classList.toggle('typing', busy);
       mon.face.setAttribute('fill', busy ? '#0C1B36' : '#060B14');
       mon.face.style.filter = busy ? 'url(#softglow)' : '';
 
-      const task = this.taskOf(a.id);
       const scr = this.nodes.screens[a.id];
+      if (a.id === '__router' || a.id === '__reviewer') {
+        const routing = (this.state.tasks || []).find((x) =>
+          x.stage === (a.id === '__router' ? 'routing' : 'review'));
+        scr.classList.toggle('live', busy);
+        scr.querySelector('b').textContent = busy
+          ? (a.id === '__router' ? 'подбираю исполнителя' : 'проверяю работу')
+          : 'свободен';
+        scr.querySelector('i').textContent = routing
+          ? routing.title
+          : `принято ${s.done}${s.waiting ? ` · возвращено ${s.waiting}` : ''}`;
+        continue;
+      }
+      const task = this.taskOf(a.id);
       const text = busy ? (task?.partial || '') : (task?.output || '');
       scr.classList.toggle('live', busy);
       scr.querySelector('b').textContent = busy ? (task?.title || 'работает')
@@ -626,8 +705,17 @@
   };
 
   Office.focusAgent = function (id) {
-    const agent = this.agents.find((a) => a.id === id);
+    const agent = this.agents.find((a) => a.id === id)
+      || (this.core || []).find((a) => a.id === id);
     if (!agent) return;
+    if (id === '__router' || id === '__reviewer') {
+      const mon = this.nodes.monitors[id];
+      this.focusedAgent = id;
+      this.flyTo(mon.at[0], mon.at[1] + 14, 2.4, 860);
+      this.showBar(agent.name);
+      this.refreshFocusPanel();
+      return;
+    }
     this.focusedBlock = agent.block;
     this.focusedAgent = id;
     const mon = this.nodes.monitors[id];
@@ -642,7 +730,8 @@
   };
 
   Office.refreshFocusPanel = function () {
-    const agent = this.agents.find((a) => a.id === this.focusedAgent);
+    const agent = this.agents.find((a) => a.id === this.focusedAgent)
+      || (this.core || []).find((a) => a.id === this.focusedAgent);
     if (!agent) return;
     const s = this.statsOf(agent.id);
     const task = this.taskOf(agent.id);
@@ -669,8 +758,9 @@
     body.scrollTop = body.scrollHeight;
 
     const done = this.statsOf(agent.id).done;
-    panel.querySelector('.ap-meta').textContent =
-      `${agent.block} · волна ${agent.wave} · принято ${done}` + (agent.custom ? ' · написан под Vitaflow' : '');
+    panel.querySelector('.ap-meta').textContent = agent.block
+      ? `${agent.block} · волна ${agent.wave} · принято ${done}` + (agent.custom ? ' · написан под Vitaflow' : '')
+      : `командный центр · через него прошло ${done}`;
   };
 
   Office.showBar = function (label) {

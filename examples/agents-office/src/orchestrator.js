@@ -71,7 +71,7 @@ export class Orchestrator {
       let agentId = task.agentId;
       let routedCost = 0;
       if (!agentId) {
-        this.store.updateTask(taskId, { status: 'routing' }, { event: 'task.routing', message: task.title });
+        this.store.updateTask(taskId, { status: 'routing', stage: 'routing' }, { event: 'task.routing', message: task.title });
         const routed = await routeTask({ agents: this.agents, task });
         agentId = routed.agentId;
         routedCost = routed.model ? costOf(routed.model, routed.usage) : 0;
@@ -103,7 +103,7 @@ export class Orchestrator {
                  `\n\nПредыдущая версия:\n${result.text}`,
         };
 
-        this.store.updateTask(taskId, { round: round + 1 });
+        this.store.updateTask(taskId, { round: round + 1, stage: round === 0 ? 'writing' : 'rework' });
         result = await runAgent({
           agent,
           task: taskForRun,
@@ -125,6 +125,7 @@ export class Orchestrator {
 
         if (!reviewEnabled() || result.mock) { verdict = null; break; }
 
+        this.store.updateTask(taskId, { stage: 'review' });
         this.store.progress(taskId, buffer + '\n\n[управляющий проверяет работу]\n', tools);
         const checked = await review({ agent, task, text: result.text });
         cost += checked.cost;
@@ -149,6 +150,7 @@ export class Orchestrator {
           tools,
           cost,
           review: verdict ? { verdict, notes } : null,
+          stage: null,
           mock: result.mock,
           finishedAt: new Date().toISOString(),
         },
