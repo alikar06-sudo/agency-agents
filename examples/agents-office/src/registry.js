@@ -68,13 +68,68 @@ export function loadAgents(rootDir) {
   return agents;
 }
 
-export function loadBrain(rootDir) {
-  const candidates = [
-    join(rootDir, 'BRAIN.md'),
-    resolve(rootDir, '../ecommerce-solo/BRAIN.md'),
-  ];
-  for (const p of candidates) {
-    if (existsSync(p)) return { path: p, text: readFileSync(p, 'utf8') };
+/**
+ * Пакет знаний магазина: папка `знания/`, которую собирает скрипт `обновить.py`
+ * из рабочей базы. Это единственный источник фактов о товарах и ценах.
+ * Если папки нет — откатываемся на простой BRAIN.md, чтобы приложение
+ * оставалось рабочим для любого другого магазина.
+ */
+export function loadKnowledge(rootDir) {
+  const dir = join(rootDir, 'знания');
+  const read = (f) => {
+    const full = join(dir, f);
+    return existsSync(full) ? readFileSync(full, 'utf8') : '';
+  };
+  const pack = {
+    dir,
+    present: existsSync(dir),
+    business: read('бизнес.md'),
+    tone: read('тон.md'),
+    rules: read('правила.md'),
+    digest: read('срез.md'),
+    catalog: read('товары.csv'),
+    topics: read('темы.md'),
+    competitors: read('конкуренты.md'),
+    files: [],
+    brain: '',
+  };
+  if (pack.present) {
+    pack.files = readdirSync(dir).filter((f) => f.endsWith('.md') || f.endsWith('.csv')).sort();
+  } else {
+    for (const p of [join(rootDir, 'BRAIN.md'), resolve(rootDir, '../ecommerce-solo/BRAIN.md')]) {
+      if (existsSync(p)) { pack.brain = readFileSync(p, 'utf8'); pack.files = [p]; break; }
+    }
   }
-  return { path: join(rootDir, 'BRAIN.md'), text: '' };
+  return pack;
+}
+
+// Кому нужны готовые разборы тем — это самый большой файл, грузим не всем.
+const NEEDS_TOPICS = new Set([
+  'content-creator', 'channel-editor', 'broadcast-manager',
+  'product-matcher', 'support-responder', 'private-domain-operator',
+]);
+
+/** Собирает контекст под конкретного агента. */
+export function composeContext(pack, agent) {
+  if (!pack.present) {
+    return pack.brain?.trim()
+      ? `## Контекст бизнеса\n\n${pack.brain}`
+      : 'Контекст бизнеса не заполнен. Не выдумывай товары, цены, сроки и правила — ' +
+        'вместо этого перечисли, каких данных не хватает.';
+  }
+  const parts = [
+    '## Бизнес\n' + pack.business,
+    '## Как мы разговариваем\n' + pack.tone,
+    '## Что нельзя писать про добавки\n' + pack.rules,
+    '## Срез магазина\n' + pack.digest,
+  ];
+  if (NEEDS_TOPICS.has(agent?.id) && pack.topics) {
+    parts.push('## Готовые разборы тем здоровья\n' + pack.topics);
+  }
+  parts.push(
+    '## Каталог — единственный источник цен, остатков и названий\n' +
+    'Формат CSV. Товар с остатком 0 не рекламируем и не предлагаем.\n\n' +
+    '```csv\n' + pack.catalog + '```',
+  );
+  return parts.join('\n\n');
 }

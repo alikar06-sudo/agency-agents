@@ -1,10 +1,10 @@
 // HTTP-сервер: REST + поток событий (SSE) + отдача панели.
 import { createServer } from 'node:http';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, extname, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
-import { loadAgents, loadBrain, parseAgentFile } from './registry.js';
+import { loadAgents, loadKnowledge, composeContext } from './registry.js';
 import { Orchestrator } from './orchestrator.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -20,8 +20,11 @@ if (!agents.length) {
   console.error('Не найден ни один агент. Проверь пути в src/registry.js');
   process.exit(1);
 }
-let brain = loadBrain(ROOT);
-const orchestrator = new Orchestrator({ store, agents, getBrain: () => brain.text });
+let knowledge = loadKnowledge(ROOT);
+const orchestrator = new Orchestrator({
+  store, agents,
+  getContext: (agent) => composeContext(knowledge, agent),
+});
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 
@@ -120,16 +123,23 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/brain' && req.method === 'GET') {
-      return json(res, 200, { path: brain.path, text: brain.text });
+      return json(res, 200, {
+        present: knowledge.present,
+        dir: knowledge.dir,
+        files: knowledge.files,
+        text: knowledge.present
+          ? [knowledge.digest, knowledge.business].filter(Boolean).join('\n\n---\n\n')
+          : knowledge.brain,
+      });
     }
 
-    if (pathname === '/api/brain' && req.method === 'POST') {
-      const body = await readBody(req);
-      if (typeof body.text !== 'string') return json(res, 400, { error: 'Нужно поле text' });
-      writeFileSync(brain.path, body.text);
-      brain = { ...brain, text: body.text };
-      store.log('brain.updated', { message: `Контекст обновлён (${body.text.length} знаков)` });
-      return json(res, 200, { ok: true, path: brain.path });
+    // Перечитать пакет знаний после `python3 знания/обновить.py`
+    if (pathname === '/api/brain/reload' && req.method === 'POST') {
+      knowledge = loadKnowledge(ROOT);
+      store.log('brain.updated', {
+        message: `Пакет знаний перечитан: ${knowledge.files.length} файлов`,
+      });
+      return json(res, 200, { ok: true, files: knowledge.files });
     }
 
     if (pathname.startsWith('/api/')) return json(res, 404, { error: 'Неизвестный маршрут' });
@@ -147,7 +157,9 @@ server.listen(PORT, HOST, () => {
     : 'ДЕМО-режим (ANTHROPIC_API_KEY не задан)';
   console.log(`Agents Office — ${mode}`);
   console.log(`Агентов загружено: ${agents.length}`);
-  console.log(`Контекст: ${existsSync(brain.path) ? brain.path : 'BRAIN.md не найден'}`);
+  console.log(knowledge.present
+    ? `Знания: ${knowledge.dir} (${knowledge.files.length} файлов, каталог ${knowledge.catalog.split('\n').length - 2} позиций)`
+    : 'Знания: папка «знания» не найдена, работаю по BRAIN.md');
   console.log(`Панель: http://${HOST}:${PORT}${TOKEN ? '?token=***' : ''}`);
 });
 

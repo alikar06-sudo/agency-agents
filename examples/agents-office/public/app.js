@@ -178,7 +178,7 @@ function showBlock(name) {
 
 async function showBrain() {
   openTaskId = null;
-  el('sheetKicker').textContent = 'общая память · BRAIN.md';
+  el('sheetKicker').textContent = 'общая память · знания магазина';
   el('sheetTitle').textContent = 'Мозг';
   el('sheetBody').textContent = 'Загружаю…';
   el('sheetActs').innerHTML = '<button class="mini ghost" data-close="1">Закрыть</button>';
@@ -186,10 +186,27 @@ async function showBrain() {
   el('overlay').hidden = false;
   try {
     const brain = await api('/api/brain');
-    el('sheetBody').textContent = brain.text?.trim()
-      ? brain.text
-      : 'BRAIN.md пуст. Пока он не заполнен, агенты будут отвечать «не хватает данных» — ' +
-        'и это правильно: иначе они начнут выдумывать состав и цены.';
+    if (!brain.present) {
+      el('sheetBody').textContent = brain.text?.trim()
+        ? brain.text
+        : 'Пакет знаний не найден. Пока его нет, агенты будут отвечать «не хватает данных» — ' +
+          'и это правильно: иначе они начнут выдумывать состав и цены.';
+      return;
+    }
+    el('sheetBody').textContent =
+      `Папка: ${brain.dir}\nФайлы: ${brain.files.join(', ')}\n` +
+      `\nЭто единственный источник фактов для агентов. Обновляется скриптом ` +
+      `«python3 знания/обновить.py» из базы магазина — руками не правим.\n` +
+      `\n${'─'.repeat(48)}\n\n${brain.text}`;
+    el('sheetActs').insertAdjacentHTML('afterbegin',
+      '<button class="mini ok" id="reloadBrain">Перечитать знания</button>');
+    el('reloadBrain').addEventListener('click', async () => {
+      try {
+        const r = await api('/api/brain/reload', { method: 'POST' });
+        alert(`Перечитано: ${r.files.length} файлов`);
+        showBrain();
+      } catch (err) { alert(err.message); }
+    });
   } catch (err) {
     el('sheetBody').textContent = `Не удалось прочитать: ${err.message}`;
   }

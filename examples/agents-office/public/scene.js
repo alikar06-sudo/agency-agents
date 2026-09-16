@@ -99,7 +99,7 @@
     bl.dataset.brain = '1';
     bl.style.left = c[0] + 'px';
     bl.style.top = (c[1] - 56) + 'px';
-    bl.innerHTML = 'МОЗГ · BRAIN.md';
+    bl.innerHTML = 'МОЗГ · знания магазина';
     this.overlay.appendChild(bl);
 
     this.layout.forEach((b) => {

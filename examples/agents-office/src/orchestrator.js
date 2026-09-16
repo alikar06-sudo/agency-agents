@@ -4,10 +4,10 @@ import { runAgent, routeTask, hasApiKey, modelName } from './llm.js';
 const CONCURRENCY = Number(process.env.AO_CONCURRENCY || 2);
 
 export class Orchestrator {
-  constructor({ store, agents, getBrain }) {
+  constructor({ store, agents, getContext }) {
     this.store = store;
     this.agents = agents;
-    this.getBrain = getBrain;
+    this.getContext = getContext;
     this.queue = [];
     this.running = 0;
   }
@@ -86,7 +86,7 @@ export class Orchestrator {
       const result = await runAgent({
         agent,
         task,
-        brain: this.getBrain(),
+        context: this.getContext(agent),
         onText: (delta) => {
           buffer += delta;
           const now = Date.now();
