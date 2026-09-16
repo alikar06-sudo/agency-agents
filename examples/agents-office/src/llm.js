@@ -25,7 +25,22 @@ function textOf(message) {
 }
 
 /** Демо-ответ: виден сразу, честно помечен как демонстрационный. */
-async function mockRun(agent, task) {
+async function mockRun(agent, task, onText) {
+  const text =
+    `[ДЕМО-РЕЖИМ — модель не подключена]\n\n` +
+    `Агент «${agent.name}» получил задачу: ${task.title}\n\n` +
+    `Здесь будет настоящий ответ, как только в .env появится ANTHROPIC_API_KEY.\n` +
+    `Сейчас это заглушка, чтобы было видно, как задача идёт по статусам.\n\n` +
+    `Что агент сделал бы на самом деле:\n${agent.description}`;
+  // печатаем кусками — экран на панели должен оживать
+  for (let i = 0; i < text.length; i += 14) {
+    await sleep(45);
+    onText?.(text.slice(i, i + 14));
+  }
+  return { mock: true, usage: null, text };
+}
+
+async function mockRunUnused(agent, task) {
   await sleep(1200 + Math.random() * 2600);
   return {
     mock: true,
@@ -41,8 +56,8 @@ async function mockRun(agent, task) {
 }
 
 /** Запуск одного агента на одной задаче. */
-export async function runAgent({ agent, task, brain }) {
-  if (!hasApiKey()) return mockRun(agent, task);
+export async function runAgent({ agent, task, brain, onText }) {
+  if (!hasApiKey()) return mockRun(agent, task, onText);
 
   const system = [
     agent.systemPrompt,
@@ -71,6 +86,9 @@ export async function runAgent({ agent, task, brain }) {
     system,
     messages: [{ role: 'user', content: userContent }],
   });
+
+  // Текст отдаём по мере генерации — панель показывает, что агент пишет сейчас.
+  if (onText) stream.on('text', (delta) => onText(delta));
 
   const message = await stream.finalMessage();
 

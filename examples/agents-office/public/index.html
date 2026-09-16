@@ -13,96 +13,94 @@
 
 <header class="topbar">
   <div class="brand">
-    <span class="logo">◆</span>
-    <span class="brand-name">AGENTS OFFICE</span>
-    <span class="brand-sub" id="shopName">Vitaflow · американские витамины</span>
+    <b>AGENTS OFFICE</b><span class="ver">v1</span>
+    <span class="shop" id="shopName">…</span>
+  </div>
+  <div class="conn">
+    <span class="conn-label">подключения</span>
+    <span class="slot" id="slotModel" title="Модель">ai</span>
+    <span class="slot" title="Telegram — не подключено">tg</span>
+    <span class="slot" title="База заказов — не подключено">db</span>
+    <span class="slot" title="Instagram — не подключено">ig</span>
   </div>
   <div class="topbar-right">
-    <span class="mode-chip" id="modeChip"><i class="dot"></i><span id="modeText">подключение…</span></span>
+    <span class="chip" id="modeChip"><i></i><span id="modeText">подключение…</span></span>
     <span class="clock" id="clock">--:--:--</span>
   </div>
 </header>
 
-<main class="layout">
+<div class="stage">
+  <div class="viewport" id="viewport">
+    <div class="world" id="world">
+      <svg id="scene" width="2800" height="1700" aria-label="Схема офиса"></svg>
+      <div id="sceneOverlay"></div>
+    </div>
 
-  <!-- ЛЕВАЯ КОЛОНКА: сеть агентов -->
-  <section class="col-main">
+    <div class="focusbar" id="focusbar" hidden>
+      <button id="backBtn">← назад</button>
+      <span class="crumb" id="crumb"></span>
+    </div>
 
-    <div class="panel orchestrator">
-      <svg class="wires" id="wires" aria-hidden="true"></svg>
-      <div class="orch-head">
+    <!-- экран сотрудника, к которому подлетели -->
+    <section class="agent-panel" id="agentPanel" hidden>
+      <header>
         <div>
-          <div class="panel-label">Командный слой</div>
-          <h1>Оркестратор</h1>
-          <p>Принимает задачу, выбирает специалиста, собирает результат и отдаёт его вам на подтверждение.</p>
+          <div class="ap-name">—</div>
+          <div class="ap-role">—</div>
         </div>
-        <div class="orch-metrics">
-          <div class="metric"><b id="mRoutes">0</b><span>маршрутов</span></div>
-          <div class="metric"><b id="mDone">0</b><span>принято</span></div>
-          <div class="metric"><b id="mWaiting">0</b><span>на проверке</span></div>
-          <div class="metric model"><b id="mModel">—</b><span>модель</span></div>
-        </div>
+        <span class="ap-status">—</span>
+      </header>
+      <div class="ap-taskline">задача: <span class="ap-task">—</span></div>
+      <pre class="ap-text"></pre>
+    </section>
+
+    <p class="hint">тяните — двигать · колесо или щипок — масштаб · клик по сотруднику — подлететь к его экрану</p>
+    <div class="zoom">
+      <button id="zIn" aria-label="Приблизить">+</button>
+      <button id="zOut" aria-label="Отдалить">−</button>
+      <button id="zFit" aria-label="Вся схема" title="Вся схема">⌂</button>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="side-head">
+      <div class="side-title">Статус задач <span class="badge zero" id="waitBadge">0</span></div>
+      <div class="filters" id="filters">
+        <button data-f="all" aria-pressed="true">все</button>
+        <button data-f="active" aria-pressed="false">в работе</button>
+        <button data-f="waiting_approval" aria-pressed="false">ждут решения</button>
+        <button data-f="approved" aria-pressed="false">приняты</button>
       </div>
     </div>
-
-    <div class="section-head">
-      <h2>Сеть агентов</h2>
-      <span class="counter" id="agentCount">0 ролей</span>
-    </div>
-    <div id="blocks" class="blocks"></div>
-
-  </section>
-
-  <!-- ПРАВАЯ КОЛОНКА: управление -->
-  <aside class="col-side">
-
-    <div class="panel form-panel">
-      <div class="panel-label">Новая задача</div>
-      <form id="taskForm">
-        <input id="taskTitle" name="taskTitle" type="text" placeholder="Что нужно сделать" autocomplete="off" required>
-        <textarea id="taskInput" name="taskInput" rows="3" placeholder="Подробности, данные, текст покупателя…"></textarea>
-        <div class="form-row">
-          <select id="taskAgent" name="taskAgent">
-            <option value="">Выбрать агента автоматически</option>
-          </select>
-          <button type="submit" id="submitBtn">В работу</button>
+    <div class="tasks" id="tasks"></div>
+    <div class="side-foot">
+      <form id="form">
+        <input id="tTitle" name="tTitle" type="text" placeholder="Новая задача — что нужно сделать" autocomplete="off">
+        <textarea id="tInput" name="tInput" rows="2" placeholder="Подробности, текст покупателя, данные…"></textarea>
+        <div class="row">
+          <select id="tAgent" name="tAgent"></select>
+          <button class="go" type="submit" id="goBtn">В работу</button>
         </div>
       </form>
     </div>
-
-    <div class="panel approvals">
-      <div class="panel-label">
-        Ждут вашего решения
-        <span class="badge" id="approvalCount">0</span>
-      </div>
-      <div id="approvalList" class="approval-list">
-        <p class="empty">Пока ничего не ждёт подтверждения.</p>
-      </div>
-    </div>
-
-    <div class="panel log-panel">
-      <div class="panel-label">Журнал <span class="muted" id="logCount"></span></div>
-      <ul id="log" class="log"></ul>
-    </div>
-
   </aside>
-</main>
+</div>
 
-<!-- Просмотр результата -->
 <div class="overlay" id="overlay" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="sheet-head">
       <div>
-        <div class="panel-label" id="sheetAgent">—</div>
+        <div class="sheet-kicker" id="sheetKicker">—</div>
         <h3 id="sheetTitle">—</h3>
       </div>
-      <button class="icon-btn" id="sheetClose" aria-label="Закрыть">✕</button>
+      <button class="x" id="sheetX" aria-label="Закрыть">✕</button>
     </div>
-    <pre id="sheetBody" class="sheet-body"></pre>
-    <div class="sheet-actions" id="sheetActions"></div>
+    <pre class="sheet-body" id="sheetBody"></pre>
+    <div class="sheet-acts" id="sheetActs"></div>
   </div>
 </div>
 
+<script src="/scene.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

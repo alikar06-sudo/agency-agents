@@ -81,13 +81,27 @@ export class Orchestrator {
       this.store.updateTask(taskId, { status: 'working', startedAt: new Date().toISOString() },
         { event: 'task.started', message: `${agent.name} — ${task.title}` });
 
-      const result = await runAgent({ agent, task, brain: this.getBrain() });
+      let buffer = '';
+      let lastPush = 0;
+      const result = await runAgent({
+        agent,
+        task,
+        brain: this.getBrain(),
+        onText: (delta) => {
+          buffer += delta;
+          const now = Date.now();
+          if (now - lastPush < 250) return;   // не чаще четырёх раз в секунду
+          lastPush = now;
+          this.store.progress(taskId, buffer);
+        },
+      });
 
       this.store.updateTask(
         taskId,
         {
           status: 'waiting_approval',
           output: result.text,
+          partial: '',
           usage: result.usage,
           mock: result.mock,
           finishedAt: new Date().toISOString(),

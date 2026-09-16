@@ -89,6 +89,7 @@ export class Store {
       routedReason: null,
       usage: null,
       mock: false,
+      partial: '',
     };
     this.tasks.set(task.id, task);
     this.#persistTasks();
@@ -103,6 +104,18 @@ export class Store {
     this.#persistTasks();
     if (event) this.log(event, { taskId: id, agentId: task.agentId, message: message ?? task.title });
     return task;
+  }
+
+  /** Прогресс печати: обновляем в памяти и шлём лёгкое событие без записи на диск. */
+  progress(id, partial) {
+    const task = this.tasks.get(id);
+    if (!task) return;
+    task.partial = partial;
+    for (const fn of this.listeners) {
+      try {
+        fn({ type: 'task.progress', ts: new Date().toISOString(), taskId: id, agentId: task.agentId, partial });
+      } catch (err) { console.error('[store] подписчик упал:', err.message); }
+    }
   }
 
   getTask(id) { return this.tasks.get(id) || null; }
