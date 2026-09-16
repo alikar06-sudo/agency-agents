@@ -218,7 +218,10 @@
   .tasks { flex: 1; overflow-y: auto; padding: 10px 14px; display: grid; gap: 7px; align-content: start; }
   .task {
     border: 1px solid var(--line); border-radius: 8px; background: #0B1220;
-    padding: 9px 10px; cursor: pointer; animation: slide 0.28s ease both;
+    padding: 9px 10px; cursor: pointer;
+    /* Без fill-mode: список перерисовывается часто, и с `both` карточка,
+       заменённая до конца анимации, навсегда осталась бы прозрачной. */
+    animation: slide 0.28s ease;
     transition: border-color 0.2s;
   }
   .task:hover { border-color: #2E4470; }
