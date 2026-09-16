@@ -50,8 +50,10 @@ function parseTime(spec) {
 }
 
 export function loadSchedule(dir) {
-  const path = join(dir, 'расписание.json');
-  if (!existsSync(path)) return [];
+  // Принимаем оба имени: русское читаемее владельцу, английское безопаснее для
+  // инструментов, которые спотыкаются о кириллицу в путях.
+  const path = [join(dir, 'расписание.json'), join(dir, 'schedule.json')].find((p) => existsSync(p));
+  if (!path) return [];
   let raw;
   try {
     raw = JSON.parse(readFileSync(path, 'utf8'));

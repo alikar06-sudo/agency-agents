@@ -6,8 +6,12 @@
 сделано, что осталось и где границы.
 
 **Как продолжить:** откройте новый чат на репозитории `alikar06-sudo/agency-agents`,
-ветка `claude/feasibility-check-nj37kj`, и скажите: «прочитай
-`examples/agents-office/ПЕРЕДАЧА.md` и продолжай». Этого достаточно.
+**обязательно выбрав ветку `claude/feasibility-check-nj37kj`** — в `main` этой
+работы нет. Затем скажите: «прочитай `examples/agents-office/HANDOFF.md` и
+продолжай». Этого достаточно.
+
+Если файл «не находится» — почти наверняка чат открыт на `main`. Проверьте:
+`git branch --show-current` должно выдать `claude/feasibility-check-nj37kj`.
 
 ## Что это за проект
 
