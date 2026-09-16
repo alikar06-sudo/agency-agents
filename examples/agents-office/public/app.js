@@ -85,6 +85,8 @@ function renderTop() {
   el('kBusy').textContent = busy;
   el('kBusy').closest('.kpi').classList.toggle('on', busy > 0);
   el('kBusy').closest('.kpi').classList.add('busy');
+  const spend = state.spend || 0;
+  el('kSpend').textContent = spend < 0.01 && spend > 0 ? '<$0.01' : '$' + spend.toFixed(2);
 }
 
 /* ---------- список задач ---------- */
@@ -106,6 +108,12 @@ function renderTasks() {
       : t.status === 'approved' ? 'done'
       : ['rejected', 'failed'].includes(t.status) ? 'off' : 'work';
     const tool = t.status === 'working' && t.tools?.length ? `⚙ ${t.tools[t.tools.length - 1]}` : '';
+    const rv = t.review
+      ? `<div class="verdict ${t.review.verdict === 'ok' ? 'ok' : 'rework'}">${
+          t.review.verdict === 'ok'
+            ? '✓ управляющий принял'
+            : '↺ управляющий вернул: ' + esc(t.review.notes[0] || '')}</div>`
+      : '';
     const preview = t.status === 'working'
       ? (tool || t.partial || 'думает…')
       : (t.output || t.error || t.input || '—');
@@ -116,6 +124,7 @@ function renderTasks() {
       </div>
       <h4>${esc(t.title)}</h4>
       <p>${esc(String(preview).slice(0, 140))}</p>
+      ${rv}
       ${t.status === 'waiting_approval' ? `<div class="task-acts">
         <button class="mini ok" data-ok="${t.id}">Принять</button>
         <button class="mini ghost" data-no="${t.id}">Отклонить</button></div>` : ''}
@@ -166,10 +175,16 @@ function showTask(id, keep = false) {
 
   const bits = [agent?.name || 'подбор агента', STATUS[t.status]];
   if (t.steps > 1) bits.push(`${t.steps} шага с инструментами`);
+  if (t.round > 1) bits.push(`${t.round}-я версия`);
+  if (t.review) bits.push(t.review.verdict === 'ok' ? 'управляющий принял' : 'после доработки');
+  if (t.cost) bits.push('$' + t.cost.toFixed(3));
   if (t.mock) bits.push('демо');
   el('sheetKicker').textContent = bits.join(' · ');
   el('sheetTitle').textContent = t.title;
-  body.textContent = t.output || t.partial || t.error || 'Задача выполняется…';
+  const verdictText = t.review && t.review.notes?.length
+    ? `— Замечания управляющего —\n` + t.review.notes.map((n) => `• ${n}`).join('\n') + `\n\n${'─'.repeat(40)}\n\n`
+    : '';
+  body.textContent = verdictText + (t.output || t.partial || t.error || 'Задача выполняется…');
   body.scrollTop = scroll;
 
   const acts = [];

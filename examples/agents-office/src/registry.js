@@ -64,6 +64,7 @@ export const ROSTER = [
   { file: 'agents/direct-responder.md',                        block: 'Поддержка', wave: 2 },
   { file: 'agents/review-collector.md',                        block: 'Поддержка', wave: 3 },
   { file: '../../specialized/retail-customer-returns.md',      block: 'Поддержка', wave: 4 },
+  { file: '../../product/product-feedback-synthesizer.md',     block: 'Поддержка', wave: 3 },
 
   // Товар и деньги
   { file: 'agents/margin-analyst.md',                          block: 'Товар и деньги', wave: 2 },
@@ -71,8 +72,10 @@ export const ROSTER = [
   { file: '../../specialized/specialized-pricing-analyst.md',  block: 'Товар и деньги', wave: 3 },
   { file: '../../support/support-finance-tracker.md',          block: 'Товар и деньги', wave: 4 },
 
-  // Трафик
+  // Трафик и визуал
   { file: '../../marketing/marketing-growth-hacker.md',        block: 'Трафик', wave: 2 },
+  { file: '../../marketing/marketing-instagram-curator.md',    block: 'Трафик', wave: 3 },
+  { file: '../../design/design-image-prompt-engineer.md',      block: 'Трафик', wave: 4 },
 
   // Цифры
   { file: '../../support/support-analytics-reporter.md',       block: 'Цифры', wave: 3 },
@@ -86,7 +89,11 @@ export function loadAgents(rootDir) {
     if (!existsSync(path)) { missing.push(entry.file); continue; }
     const agent = parseAgentFile(path);
     if (!agent) { missing.push(entry.file + ' (нет frontmatter)'); continue; }
-    agents.push({ ...agent, block: entry.block, wave: entry.wave, custom: entry.file.startsWith('agents/') });
+    const tune = TUNING[agent.id] || {};
+    agents.push({
+      ...agent, ...tune,
+      block: entry.block, wave: entry.wave, custom: entry.file.startsWith('agents/'),
+    });
   }
   if (missing.length) console.warn('[registry] не найдены:', missing.join(', '));
   return agents;
@@ -146,6 +153,31 @@ const NEEDS_DATABASE = new Set([
   'analytics-reporter', 'finance-tracker', 'margin-analyst', 'restock-planner',
   'senior-developer', 'devops-automator', 'rapid-prototyper',
 ]);
+
+// Глубина проработки и потолок ответа под роль. Механическим ролям высокая
+// глубина не нужна — она только жжёт токены на рассуждение.
+const TUNING = {
+  // проверки и разборы по чек-листу
+  'legal-compliance-checker': { effort: 'medium', maxTokens: 6000 },
+  'catalog-keeper':           { effort: 'medium', maxTokens: 8000 },
+  'restock-planner':          { effort: 'medium', maxTokens: 6000 },
+  'margin-analyst':           { effort: 'medium', maxTokens: 8000 },
+  // короткие ответы покупателю
+  'order-desk':               { effort: 'medium', maxTokens: 4000 },
+  'delivery-coordinator':     { effort: 'medium', maxTokens: 4000 },
+  'support-responder':        { effort: 'medium', maxTokens: 4000 },
+  'direct-responder':         { effort: 'medium', maxTokens: 4000 },
+  'review-collector':         { effort: 'medium', maxTokens: 5000 },
+  // тексты, где качество важнее экономии
+  'content-creator':          { effort: 'high', maxTokens: 12000 },
+  'channel-editor':           { effort: 'high', maxTokens: 12000 },
+  'uzbek-editor':             { effort: 'high', maxTokens: 10000 },
+  'product-matcher':          { effort: 'high', maxTokens: 8000 },
+  'returns-policy':           { effort: 'high', maxTokens: 10000 },
+  'instagram-curator':        { effort: 'high', maxTokens: 10000 },
+  'image-prompt-engineer':    { effort: 'medium', maxTokens: 6000 },
+  'feedback-synthesizer':     { effort: 'medium', maxTokens: 8000 },
+};
 
 /** Собирает контекст под конкретного агента. */
 export function composeContext(pack, agent, catalog) {

@@ -3,9 +3,29 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 const MODEL = process.env.AO_MODEL || 'claude-opus-5';
+// Мелкие служебные вызовы — на дешёвой модели: они не требуют глубины.
+const MODEL_SMALL = process.env.AO_MODEL_SMALL || 'claude-haiku-4-5';
 const MAX_TOKENS = Number(process.env.AO_MAX_TOKENS || 16000);
 const EFFORT = process.env.AO_EFFORT || 'high';
 const MAX_STEPS = Number(process.env.AO_MAX_STEPS || 8);
+
+// Цены за миллион токенов. Кэш: чтение ~0.1x входа, запись 1.25x (TTL 5 минут).
+const PRICES = {
+  'claude-opus-5':   { in: 5, out: 25 },
+  'claude-sonnet-5': { in: 2, out: 10 },
+  'claude-haiku-4-5': { in: 1, out: 5 },
+};
+
+export function costOf(model, usage) {
+  const p = PRICES[model] || PRICES['claude-opus-5'];
+  const u = usage || {};
+  return (
+    (u.input_tokens || 0) * p.in +
+    (u.cache_read_input_tokens || 0) * p.in * 0.1 +
+    (u.cache_creation_input_tokens || 0) * p.in * 1.25 +
+    (u.output_tokens || 0) * p.out
+  ) / 1e6;
+}
 
 let client = null;
 export function hasApiKey() {
@@ -114,16 +134,19 @@ export async function runAgent({ agent, task, context, catalog, onText, onTool }
     content: task.input?.trim() ? `Задача: ${task.title}\n\n${task.input}` : `Задача: ${task.title}`,
   }];
 
-  const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0 };
+  const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   let steps = 0;
 
   for (steps = 1; steps <= MAX_STEPS; steps++) {
     const stream = getClient().messages.stream({
       model: MODEL,
-      max_tokens: MAX_TOKENS,
+      max_tokens: agent.maxTokens || MAX_TOKENS,
       thinking: { type: 'adaptive' },
-      output_config: { effort: EFFORT },
-      system,
+      output_config: { effort: agent.effort || EFFORT },
+      // Системный промпт у роли не меняется от задачи к задаче — кэшируем его.
+      // Порядок префикса: tools → system → messages, поэтому набор инструментов
+      // обязан оставаться неизменным, иначе кэш промахнётся.
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       tools: catalog?.size ? TOOLS : undefined,
       messages,
     });
@@ -184,8 +207,8 @@ export async function routeTask({ agents, task }) {
     .join('\n');
 
   const response = await getClient().messages.create({
-    model: MODEL,
-    max_tokens: 1000,
+    model: MODEL_SMALL,
+    max_tokens: 400,
     system:
       'Ты распределяешь задачи между сотрудниками магазина витаминов Vitaflow в Ташкенте. ' +
       'Выбери ровно одного исполнителя — того, чья роль ближе всего к сути задачи. ' +
@@ -200,9 +223,10 @@ export async function routeTask({ agents, task }) {
   const id = text.match(/ID:\s*([a-z0-9-]+)/i)?.[1];
   const reason = text.match(/ПРИЧИНА:\s*(.+)/i)?.[1]?.trim() || 'выбор модели';
   const known = agents.find((a) => a.id === id);
+  const usage = response.usage;
   return known
-    ? { agentId: known.id, reason }
-    : { agentId: fallback.id, reason: 'модель не назвала известного сотрудника, взят дежурный' };
+    ? { agentId: known.id, reason, usage, model: MODEL_SMALL }
+    : { agentId: fallback.id, reason: 'модель не назвала известного сотрудника, взят дежурный', usage, model: MODEL_SMALL };
 }
 
 /* ---------------- системный промпт ---------------- */
@@ -249,3 +273,5 @@ function buildSystem(agent, context) {
 }
 
 export const modelName = MODEL;
+export const smallModelName = MODEL_SMALL;
+export { getClient };
