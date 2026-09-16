@@ -31,7 +31,64 @@ export class Catalog {
     }
   }
 
+  /** Живой каталог из магазина. Источник пишем без query — там может быть токен. */
+  static async fromUrl(url, token = '', timeoutMs = 10000) {
+    const headers = { accept: 'application/json' };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { headers, signal: ctrl.signal });
+      if (!res.ok) throw new Error(`ответ ${res.status}`);
+      const raw = await res.json();
+      const list = Array.isArray(raw) ? raw : (raw.товары || raw.items || raw.products || raw.data);
+      if (!Array.isArray(list)) throw new Error('в ответе нет массива товаров');
+      if (!list.length) throw new Error('каталог пуст');
+      return new Catalog(list.map((x) => Catalog.normalize(x)), url.replace(/\?.*$/, ''));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /* Магазин может отдавать поля по-английски. Приводим к тем именам, которые
+     ждут промпты и инструменты, — переписывать API магазина не нужно.
+     Себестоимость сюда не тянем сознательно: наружу она не ходит. */
+  static normalize(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    if (raw.цена_сум !== undefined || raw.карточка_ru) return raw;
+    const pick = (...keys) => {
+      for (const k of keys) {
+        const v = raw[k];
+        if (v !== undefined && v !== null && v !== '') return v;
+      }
+      return undefined;
+    };
+    return {
+      ...raw,
+      id: pick('id', 'ID', 'sku', 'артикул', 'code'),
+      название: pick('название', 'наименование', 'name', 'title') || '',
+      бренд: pick('бренд', 'производитель', 'brand', 'manufacturer') || '',
+      категория: pick('категория', 'группа', 'category', 'group') || 'без категории',
+      цена_сум: num(pick('цена_сум', 'цена', 'price', 'price_uzs', 'sale_price')),
+      остаток: num(pick('остаток', 'количество', 'stock', 'quantity', 'qty', 'balance')),
+      вещество: pick('вещество', 'substance', 'ingredient'),
+      дозировка: pick('дозировка', 'dosage', 'dose'),
+      форма: pick('форма', 'form'),
+      штук_в_банке: pick('штук_в_банке', 'штук', 'count', 'pieces', 'per_pack'),
+      польза: pick('польза', 'описание', 'benefit', 'description'),
+      кэшбэк_процент: num(pick('кэшбэк_процент', 'кэшбэк', 'cashback', 'cashback_percent')),
+    };
+  }
+
   get size() { return this.items.length; }
+
+  /** Отпечаток цен и остатков: по нему видно, поменялось ли что-то на самом деле. */
+  fingerprint() {
+    return this.items
+      .map((x) => `${x.id}:${num(x.цена_сум)}:${num(x.остаток)}`)
+      .sort()
+      .join('|');
+  }
 
   stats() {
     const inStock = this.items.filter((x) => num(x.остаток) > 0);

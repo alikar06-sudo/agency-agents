@@ -1,6 +1,7 @@
 // HTTP-сервер: REST + поток событий (SSE) + отдача панели.
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, extname, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
@@ -18,6 +19,29 @@ const TOKEN = process.env.AO_TOKEN || '';
 // открывает панель чужой странице, поэтому это осознанное разрешение.
 const EMBED_ORIGIN = (process.env.AO_EMBED_ORIGIN || '').trim();
 
+/* Отпечаток собранной панели: по нему видно, какую версию реально отдаёт
+   сервер и какую показывает браузер. Без него «я обновил, а не поменялось»
+   невозможно проверить — остаётся только гадать. */
+const BUILD = (() => {
+  try {
+    const parts = readdirSync(PUBLIC_DIR).sort().map((f) => {
+      const st = statSync(join(PUBLIC_DIR, f));
+      return `${f}:${st.size}:${Math.round(st.mtimeMs)}`;
+    });
+    return createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 8);
+  } catch {
+    return 'unknown';
+  }
+})();
+const STARTED_AT = new Date().toISOString();
+
+/* Живой каталог. Пока он не задан, агенты работают по снимку из «знания» —
+   значит правка цены в админке до них не доходит, пока снимок не пересобрали
+   руками. С этим адресом каталог перечитывается сам. */
+const CATALOG_URL = (process.env.AO_CATALOG_URL || '').trim();
+const CATALOG_TOKEN = (process.env.AO_CATALOG_TOKEN || '').trim();
+const CATALOG_REFRESH = Math.max(20, Number(process.env.AO_CATALOG_REFRESH_SEC || 120)) * 1000;
+
 const store = new Store();
 const agents = loadAgents(ROOT);
 if (!agents.length) {
@@ -31,6 +55,31 @@ const orchestrator = new Orchestrator({
   getContext: (agent) => composeContext(knowledge, agent, catalog),
   getCatalog: () => catalog,
 });
+
+/* Тянем каталог из магазина. Неудача не должна обнулять ассортимент: если
+   магазин не ответил, продолжаем работать по последней удачной копии. */
+let catalogPrint = catalog.fingerprint();
+async function pullCatalog(reason) {
+  if (!CATALOG_URL) return false;
+  try {
+    const fresh = await Catalog.fromUrl(CATALOG_URL, CATALOG_TOKEN);
+    const print = fresh.fingerprint();
+    const first = catalog.source !== fresh.source;
+    catalog = fresh;
+    if (print === catalogPrint && !first) return false;
+    catalogPrint = print;
+    const st = fresh.stats();
+    store.log('catalog.updated', {
+      message: `Каталог из магазина: ${fresh.size} позиций, ${st.inStock} в наличии (${reason})`,
+    });
+    return true;
+  } catch (err) {
+    store.log('catalog.failed', {
+      message: `Каталог из магазина не прочитан: ${err.message}. Работаю по последней копии (${catalog.size} позиций).`,
+    });
+    return false;
+  }
+}
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 
@@ -61,21 +110,35 @@ function authorized(req, url) {
   return header === `Bearer ${TOKEN}` || url.searchParams.get('token') === TOKEN;
 }
 
-function serveStatic(res, pathname) {
+function serveStatic(res, pathname, ifNoneMatch) {
   const file = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   const full = join(PUBLIC_DIR, file);
   if (!full.startsWith(PUBLIC_DIR) || !existsSync(full)) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     return res.end('Не найдено');
   }
+  /* Валидаторы обязательны. Без Cache-Control и ETag браузер кэширует файл
+     «на своё усмотрение» и после выкладки новой версии продолжает показывать
+     старую панель — особенно внутри iframe, который держат открытым часами.
+     no-cache не запрещает кэш, а требует каждый раз спросить сервер: ответ
+     304 без тела стоит копейки, зато обновление доходит сразу. */
+  const st = statSync(full);
+  const etag = `W/"${st.size.toString(16)}-${Math.round(st.mtimeMs).toString(16)}"`;
   const headers = {
     'content-type': MIME[extname(full)] || 'application/octet-stream',
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'same-origin',
+    'cache-control': 'no-cache',
+    etag,
+    'last-modified': st.mtime.toUTCString(),
   };
   if (extname(full) === '.html') {
     headers['content-security-policy'] =
       `frame-ancestors ${EMBED_ORIGIN ? `'self' ${EMBED_ORIGIN}` : "'none'"}`;
+  }
+  if (ifNoneMatch === etag) {
+    res.writeHead(304, headers);
+    return res.end();
   }
   res.writeHead(200, headers);
   res.end(readFileSync(full));
@@ -89,7 +152,9 @@ const server = createServer(async (req, res) => {
 
   try {
     if (pathname === '/api/state' && req.method === 'GET') {
-      return json(res, 200, orchestrator.snapshot());
+      const snapshot = orchestrator.snapshot();
+      snapshot.runtime.build = BUILD;
+      return json(res, 200, snapshot);
     }
 
     if (pathname === '/api/stream' && req.method === 'GET') {
@@ -153,15 +218,24 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/brain/reload' && req.method === 'POST') {
       knowledge = loadKnowledge(ROOT);
       catalog = Catalog.fromFile(knowledge.dir);
+      if (CATALOG_URL) await pullCatalog('кнопка «перечитать знания»');
       store.log('brain.updated', {
         message: `Пакет знаний перечитан: ${knowledge.files.length} файлов`,
       });
       return json(res, 200, { ok: true, files: knowledge.files, catalog: catalog.stats() });
     }
 
+    // Чем именно сейчас отвечает сервер — для проверки после выкладки
+    if (pathname === '/api/version' && req.method === 'GET') {
+      return json(res, 200, {
+        build: BUILD, startedAt: STARTED_AT, agents: agents.length,
+        catalogSource: catalog.source, catalogReadAt: catalog.at, catalog: catalog.stats(),
+      });
+    }
+
     if (pathname.startsWith('/api/')) return json(res, 404, { error: 'Неизвестный маршрут' });
 
-    return serveStatic(res, pathname);
+    return serveStatic(res, pathname, req.headers['if-none-match']);
   } catch (err) {
     console.error('[server]', err);
     return json(res, 400, { error: err.message });
@@ -177,10 +251,19 @@ server.listen(PORT, HOST, () => {
   console.log(knowledge.present
     ? `Знания: ${knowledge.files.length} файлов · каталог ${catalog.size} позиций (${catalog.stats().inStock} в наличии)`
     : 'Знания: папка «знания» не найдена, работаю по BRAIN.md');
+  console.log(`Сборка панели: ${BUILD}`);
+  console.log(CATALOG_URL
+    ? `Каталог: живой, ${CATALOG_URL.replace(/\?.*$/, '')}, обновление раз в ${CATALOG_REFRESH / 1000} с`
+    : 'Каталог: снимок из «знания» (задайте AO_CATALOG_URL, чтобы читать магазин вживую)');
   console.log(`Панель: http://${HOST}:${PORT}${TOKEN ? '?token=***' : ''}`);
   console.log(EMBED_ORIGIN
     ? `Встраивание разрешено для: ${EMBED_ORIGIN}`
     : 'Встраивание запрещено (задайте AO_EMBED_ORIGIN, чтобы вставить панель в админку)');
 });
 
-export { server, orchestrator, store };
+if (CATALOG_URL) {
+  await pullCatalog('старт');
+  setInterval(() => pullCatalog('по расписанию'), CATALOG_REFRESH).unref?.();
+}
+
+export { server, orchestrator, store, pullCatalog };

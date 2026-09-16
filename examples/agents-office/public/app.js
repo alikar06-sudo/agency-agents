@@ -56,18 +56,40 @@ function applyProgress(event) {
   Office.update(state);
 }
 
+/* Поток событий — основной канал, но не единственный. Обратный прокси или
+   корпоративная сеть умеют молча резать SSE: соединение висит, событий нет,
+   и панель замирает на состоянии, каким оно было при загрузке страницы.
+   Поэтому рядом идёт опрос: часто, пока поток молчит, и редко — как страховка,
+   когда он живой. */
+let streamLive = false;
+let lastEventAt = Date.now();
+
 function connectStream() {
   const source = new EventSource(withToken('/api/stream'));
+  source.addEventListener('hello', () => { streamLive = true; lastEventAt = Date.now(); });
   source.addEventListener('change', (e) => {
+    streamLive = true;
+    lastEventAt = Date.now();
     let payload = null;
     try { payload = JSON.parse(e.data); } catch { /* битое событие пропускаем */ }
     if (payload && payload.type === 'task.progress') return applyProgress(payload);
     refresh();
   });
   source.addEventListener('error', () => {
+    streamLive = false;
     el('modeChip').classList.remove('live');
     setTimeout(() => { source.close(); connectStream(); }, 4000);
   });
+}
+
+function startPolling() {
+  setInterval(() => {
+    if (document.hidden) return;                 // вкладка свёрнута — не дёргаем сервер
+    const silent = Date.now() - lastEventAt;
+    if (!streamLive || silent > 45000) refresh();
+  }, 8000);
+  // Вернулись на вкладку с админкой — показываем свежее состояние сразу
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 }
 
 /* ---------- шапка ---------- */
@@ -386,4 +408,4 @@ setInterval(() => { el('clock').textContent = new Date().toLocaleTimeString('ru-
 
 refresh();
 connectStream();
-setInterval(refresh, 20000);
+startPolling();
