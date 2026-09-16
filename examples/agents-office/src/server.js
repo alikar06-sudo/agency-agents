@@ -14,6 +14,9 @@ const PUBLIC_DIR = join(ROOT, 'public');
 const PORT = Number(process.env.PORT || process.env.AO_PORT || 8787);
 const HOST = process.env.AO_HOST || '127.0.0.1';
 const TOKEN = process.env.AO_TOKEN || '';
+// Кому разрешено встраивать панель в iframe. Пусто — никому: встраивание
+// открывает панель чужой странице, поэтому это осознанное разрешение.
+const EMBED_ORIGIN = (process.env.AO_EMBED_ORIGIN || '').trim();
 
 const store = new Store();
 const agents = loadAgents(ROOT);
@@ -65,7 +68,16 @@ function serveStatic(res, pathname) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     return res.end('Не найдено');
   }
-  res.writeHead(200, { 'content-type': MIME[extname(full)] || 'application/octet-stream' });
+  const headers = {
+    'content-type': MIME[extname(full)] || 'application/octet-stream',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'same-origin',
+  };
+  if (extname(full) === '.html') {
+    headers['content-security-policy'] =
+      `frame-ancestors ${EMBED_ORIGIN ? `'self' ${EMBED_ORIGIN}` : "'none'"}`;
+  }
+  res.writeHead(200, headers);
   res.end(readFileSync(full));
 }
 
@@ -166,6 +178,9 @@ server.listen(PORT, HOST, () => {
     ? `Знания: ${knowledge.files.length} файлов · каталог ${catalog.size} позиций (${catalog.stats().inStock} в наличии)`
     : 'Знания: папка «знания» не найдена, работаю по BRAIN.md');
   console.log(`Панель: http://${HOST}:${PORT}${TOKEN ? '?token=***' : ''}`);
+  console.log(EMBED_ORIGIN
+    ? `Встраивание разрешено для: ${EMBED_ORIGIN}`
+    : 'Встраивание запрещено (задайте AO_EMBED_ORIGIN, чтобы вставить панель в админку)');
 });
 
 export { server, orchestrator, store };

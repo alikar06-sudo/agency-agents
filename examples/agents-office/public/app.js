@@ -3,6 +3,11 @@ const token = new URLSearchParams(location.search).get('token') || '';
 const withToken = (p) => (token ? `${p}${p.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : p);
 
 const el = (id) => document.getElementById(id);
+
+// Встроенный режим: панель живёт внутри чужой страницы, поэтому своя шапка
+// и часы там лишние — место отдаём сцене.
+const EMBED = new URLSearchParams(location.search).get('embed') === '1';
+if (EMBED) document.documentElement.classList.add('embed');
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nf = (n) => Number(n || 0).toLocaleString('ru-RU');

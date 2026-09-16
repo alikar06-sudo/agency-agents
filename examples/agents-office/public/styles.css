@@ -524,3 +524,12 @@ button.mini.ghost:hover { color: var(--text); border-color: #2E4470; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
+
+/* ======================= встроенный режим ======================= */
+/* Панель внутри админки: своей шапки нет, всё место отдано сцене и задачам. */
+.embed .topbar { display: none; }
+.embed .stage { padding-top: 0; }
+.embed .hint { display: none; }
+@media (max-width: 980px) {
+  .embed .stage { grid-template-rows: 52% 48%; }
+}
