@@ -99,7 +99,7 @@ export class Engine {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.2;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.floaters = new FloaterLayer(container);
@@ -526,11 +526,12 @@ export class Engine {
       this.sky.visible = false;
       const amb = def.ambientLight ?? 1;
       const dark = def.dark ? 0.12 : 1;
-      this.hemi.intensity = 0.42 * amb * dark;
+      const themeAmb = def.theme === 'dungeon' ? 0.6 : def.theme === 'sanctum' ? 0.55 : def.theme === 'ruins' ? 0.7 : 0.95;
+      this.hemi.intensity = themeAmb * amb * dark;
       this.hemi.color.set(def.theme === 'sanctum' ? 0x4a5aa0 : def.theme === 'dungeon' ? 0x5a6080 : 0xc0a080);
       this.hemi.groundColor.set(0x18120e);
       // свет из окон днём
-      this.sun.intensity = (0.12 + d * 0.5) * amb * dark * (def.theme === 'dungeon' || def.theme === 'sanctum' ? 0.3 : 1);
+      this.sun.intensity = (0.35 + d * 0.7) * amb * dark * (def.theme === 'dungeon' || def.theme === 'sanctum' ? 0.35 : 1);
       this.sun.color.set(d > 0.3 ? 0xffe6c0 : 0x8090c0);
       this.sun.castShadow = false;
     }

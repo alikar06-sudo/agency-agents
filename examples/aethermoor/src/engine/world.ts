@@ -195,6 +195,8 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
         if (BLOCKING_MARKERS.has(marker.kind)) grid.walk[i] = 1;
         if (SHOT_BLOCKING_MARKERS.has(marker.kind)) grid.shot[i] = 1;
         if (marker.kind === 'secret' && marker.prop === 'wall') { grid.walk[i] = 1; grid.shot[i] = 1; }
+        if (marker.deco) buildProp(marker.deco, x, z, facingFromWalls(c, r), propCtx);
+        if (marker.kind === 'light' && marker.prop === 'fireplace') { grid.walk[i] = 1; }
       } else if (SOLID_PROPS.has(ch) || ch === 'Q') {
         grid.walk[i] = 1;
         if (!LOW_PROPS.has(ch)) grid.shot[i] = 1;

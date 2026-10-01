@@ -124,7 +124,10 @@ export class Interactable {
       case 'ore': {
         const item = ITEMS[d.item ?? 'sunleaf'];
         const color = new THREE.Color(item?.color ?? '#88cc66');
-        if (d.kind === 'herb') {
+        if (d.item === 'spring_water') {
+          const ring = new THREE.Mesh(SG.cyl, colorMat(0x7a7468, { rough: 0.9 })); ring.scale.set(0.8, 0.5, 0.8); ring.position.y = 0.25; o.add(ring);
+          const water = new THREE.Mesh(SG.cyl, new THREE.MeshStandardMaterial({ color: 0x4a9ac8, roughness: 0.05, emissive: 0x0a3a5a })); water.scale.set(0.66, 0.05, 0.66); water.position.y = 0.5; o.add(water);
+        } else if (d.kind === 'herb') {
           for (let i = 0; i < 5; i++) {
             const a = (i / 5) * Math.PI * 2;
             const leaf = new THREE.Mesh(SG.coneLo, colorMat(0x3a7a3a, { rough: 0.9 }));
@@ -299,6 +302,18 @@ export class Interactable {
         this.glow = sprite(d.color ?? 0x8ad8ff, 2.2); this.glow.position.y = 1.8; o.add(this.glow);
         this.mgr.zone!.lights.push({ x: this.x, y: 1.8, z: this.z, color: d.color ?? 0x8ad8ff, intensity: 1.6, distance: 10, flicker: 0.05, kind: 'crystal' });
         if (d.prop === 'candles') this.buildFloatingCandles(d.radius ?? 6);
+        if (d.prop === 'fireplace') {
+          cr.visible = false;
+          const stone = colorMat(0x6a5a4a, { rough: 0.95 });
+          const hearth = new THREE.Mesh(SG.box, stone); hearth.scale.set(3.2, 2.6, 1.0); hearth.position.set(0, 1.3, -0.5); o.add(hearth);
+          const mouth = new THREE.Mesh(SG.box, colorMat(0x120c0a)); mouth.scale.set(1.8, 1.3, 0.2); mouth.position.set(0, 0.75, 0.02); o.add(mouth);
+          const mantel = new THREE.Mesh(SG.box, colorMat(0x4a3220)); mantel.scale.set(3.6, 0.2, 1.2); mantel.position.set(0, 2.65, -0.4); o.add(mantel);
+          for (let i = 0; i < 3; i++) { const log = new THREE.Mesh(SG.cylLo, colorMat(0x3a2414)); log.scale.set(0.12, 1.1, 0.12); log.rotation.z = Math.PI / 2; log.rotation.y = (i - 1) * 0.4; log.position.set(0, 0.2 + i * 0.08, 0.15); o.add(log); }
+          if (this.glow) { this.glow.position.set(0, 0.7, 0.2); this.glow.material.color.set(0xff8a3a); this.glow.scale.setScalar(2.6); }
+          const l = this.mgr.zone!.lights[this.mgr.zone!.lights.length - 1];
+          l.color = 0xff8a3a; l.intensity = 2.6; l.distance = 14; l.flicker = 0.35; l.y = 1; l.z = this.z + 0.6;
+          this.state.fire = true;
+        }
         break;
       }
       default:
@@ -635,6 +650,7 @@ export class Interactable {
       this.obj.position.set(this.x, 0, this.z);
     }
     if (this.kind === 'seal' && this.state.circle) (this.state.circle as THREE.Object3D).rotation.y += dt * 0.3;
+    if (this.state.fire === true && Math.random() < dt * 12) this.eng.particles.emit({ x: this.x + (Math.random() - 0.5) * 1.2, y: 0.5, z: this.z + 0.2, count: 1, speed: 0.4, up: 1.6, life: 0.7, color: 0xffa040, color2: 0xff3010, size: 0.6 });
     if (this.kind === 'exit') {
       const mat = this.state.mat as THREE.MeshBasicMaterial;
       mat.opacity = 0.12 + Math.sin(this.t * 2) * 0.05;

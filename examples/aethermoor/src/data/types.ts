@@ -354,6 +354,7 @@ export interface MarkerDef {
   facing?: number;
   radius?: number;
   prop?: string;           // визуальная модель для interact
+  deco?: string;           // символ декоративного пропа, который строится под маркером (без блокировки)
   dialogue?: string;
   lore?: string;
 }

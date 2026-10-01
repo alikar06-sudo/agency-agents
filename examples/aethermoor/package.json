@@ -13,7 +13,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "node server/server.mjs",
     "typecheck": "tsc --noEmit",
-    "validate": "node scripts/validate-content.mjs",
+    "validate": "tsx scripts/validate-content.ts",
     "qa": "node scripts/qa.mjs"
   },
   "dependencies": {

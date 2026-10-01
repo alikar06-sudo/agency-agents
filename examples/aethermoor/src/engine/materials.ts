@@ -26,8 +26,8 @@ export function withCutaway<T extends THREE.Material>(mat: T, strength = 1): T {
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
         if (uCut > 0.5) {
           vec3 cd = vCutWorld - uFocus;
-          if (cd.z > 0.45 && cd.z < 11.0 && vCutWorld.y > uFocus.y + ${(0.35 / strength).toFixed(2)}) {
-            float halfW = 2.4 + cd.z * 0.18;
+          if (cd.z > 0.45 && cd.z < 16.0 && vCutWorld.y > uFocus.y + ${(0.35 / strength).toFixed(2)}) {
+            float halfW = 2.8 + cd.z * 0.28;
             float ax = abs(cd.x);
             float k = smoothstep(halfW, halfW - 1.1, ax);
             float n = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);

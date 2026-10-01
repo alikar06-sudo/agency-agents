@@ -32,7 +32,8 @@ export function App() {
     };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
-    (window as unknown as { __aether: unknown }).__aether = { engine };
+    // Отладочный доступ для автоматического QA (scripts/qa.mjs) и консоли разработчика.
+    void import('@/game/debug').then((m) => m.exposeDebug());
     return () => {
       alive = false;
       window.removeEventListener('pointerdown', unlock);

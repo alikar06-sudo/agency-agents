@@ -36,7 +36,7 @@ export const hall: ZoneDef = {
     '######..######' + '########........########' + '######..######',
     '#B....&.....B#c......................c#b.b.b..a....#',
     '#B...ttt....B#.SK...................S.#............#',
-    '#............#..........----..........#.....I......#',
+    '#........D...#..........----..........#.....I......#',
     '#.tt.tt.tt.tt#..........-e--..........#b.b.b.......#',
     '#............#.n........----........n.#............#',
     '#.tt.tt.tt.tt#..........----..........#k..........c#',
@@ -81,6 +81,9 @@ export const hall: ZoneDef = {
     'J': { kind: 'secret', id: 'secret_wall_transfig', prop: 'wall', hidden: true, floor: '.' },
     'L': { kind: 'secret', id: 'mark_hall_secret', hidden: true, label: 'Знак Звезды', text: 'В пыли тайной комнаты проступает восьмилучевая звезда Орина.', floor: '.' },
     'K': { kind: 'secret', id: 'mark_hall_statue', hidden: true, label: 'Знак Бастиона', text: 'У подножия статуи загорается щит Торвальда.', floor: '.' },
+    'D': { kind: 'interact', id: 'glitch_transfig', prop: 'orb', color: 0xc08aff, label: 'Сбой трансформации', once: true, if: [{ quest: 'mq_glitches', is: 'active' }],
+      text: 'Парта под вашей рукой на миг становится жабой, потом стопкой книг, потом снова партой. В трещине лака светится руна — она отрывается и ложится вам в ладонь. Книги на полках начинают шелестеть…',
+      effects: [{ give: 'rune_fragment' }, { script: 'glitchBooks' }], floor: '.' },
     'C': { kind: 'chest', id: 'secret_chest', loot: [{ id: 'old_coin', count: 3 }, { id: 'scholar_hat' }], gold: 40, label: 'Пыльный сундук', floor: '.' },
   },
 };
