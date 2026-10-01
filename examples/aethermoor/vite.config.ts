@@ -6,6 +6,8 @@ import { fileURLToPath, URL } from 'node:url';
 const API_PORT = Number(process.env.AETHER_PORT || 8790);
 
 export default defineConfig({
+  // относительные пути: сборку можно раздавать из любого каталога
+  base: './',
   plugins: [react()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {

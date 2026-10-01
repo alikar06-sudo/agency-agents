@@ -4,6 +4,7 @@ import { migrateSave } from '@/state/gameState';
 import { G, hasGame, mutate, setUI, toast, ui } from '@/state/store';
 import { ZONES } from '@/data/zones';
 import { CIRCLES } from '@/data/world';
+import { STATIC_BUILD } from '@/core/env';
 
 export interface SaveMeta {
   slot: string;
@@ -122,6 +123,7 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = 1500):
 }
 
 export async function initSaves(): Promise<void> {
+  if (STATIC_BUILD) { remote = null; setUI({ cloud: 'offline' }); return; }
   try {
     const res = await fetchWithTimeout('/api/health');
     if (!res.ok) throw new Error('offline');
@@ -176,6 +178,15 @@ export async function saveGame(slot: string, quiet = false): Promise<boolean> {
   }
   if (!quiet) toast('info', 'Игра сохранена', `${SLOT_NAMES[slot] ?? slot}${remote ? ' · копия в облаке' : ''}`);
   return true;
+}
+
+// Синхронная запись автосохранения (перед перезагрузкой страницы).
+export function saveLocalNow(): void {
+  if (!hasGame()) return;
+  try {
+    mutate((g) => { g.updatedAt = Date.now(); });
+    localStorage.setItem(LOCAL_PREFIX + 'auto', JSON.stringify(G()));
+  } catch { /* хранилище недоступно */ }
 }
 
 export function autosave(force = false): void {

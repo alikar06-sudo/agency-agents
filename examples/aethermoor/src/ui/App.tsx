@@ -3,6 +3,7 @@ import { useUI, setUI } from '@/state/store';
 import { engine } from '@/engine/Engine';
 import { bootGame } from '@/game/game';
 import { audio } from '@/core/audio';
+import { DEBUG_HOOKS } from '@/core/env';
 import { Title } from './screens/Title';
 import { Intro } from './screens/Intro';
 import { Creation } from './screens/Creation';
@@ -33,7 +34,7 @@ export function App() {
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
     // Отладочный доступ для автоматического QA (scripts/qa.mjs) и консоли разработчика.
-    void import('@/game/debug').then((m) => m.exposeDebug());
+    if (DEBUG_HOOKS) void import('@/game/debug').then((m) => m.exposeDebug());
     return () => {
       alive = false;
       window.removeEventListener('pointerdown', unlock);

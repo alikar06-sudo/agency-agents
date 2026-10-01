@@ -3,6 +3,7 @@ import { useSettings, setSettings, useUI } from '@/state/store';
 import type { Settings } from '@/state/store';
 import { KEY_LABELS, REBINDABLE, keyName, boundKey } from '@/core/input';
 import type { Action } from '@/core/input';
+import { STATIC_BUILD } from '@/core/env';
 
 function Slider({ k, label }: { k: keyof Settings; label: string }) {
   const v = useSettings((s) => s[k]) as number;
@@ -72,7 +73,9 @@ export function SettingsPanel() {
       <div className="dim" style={{ fontSize: 14, lineHeight: 1.5 }}>
         {cloud === 'online'
           ? 'Сервер Академии на связи: каждое сохранение дублируется в облако (server/data) под вашим гостевым профилем.'
-          : 'Сервер не запущен — сохранения хранятся только в этом браузере (localStorage). Запустите `npm start`, чтобы включить облачную копию.'}
+          : STATIC_BUILD
+            ? 'Веб-версия без сервера: сохранения хранятся в этом браузере. В полной версии (npm start) каждое сохранение дублируется в облако.'
+            : 'Сервер не запущен — сохранения хранятся только в этом браузере (localStorage). Запустите `npm start`, чтобы включить облачную копию.'}
       </div>
     </div>
   );

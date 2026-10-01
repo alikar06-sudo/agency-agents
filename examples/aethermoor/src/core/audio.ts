@@ -1,6 +1,7 @@
 // Звуковой движок на Web Audio API.
 // Музыка, эмбиент и эффекты синтезируются процедурно. Если в public/audio/manifest.json
 // указан файл для идентификатора (например "sfx.spark" или "music.castle"), будет играть он.
+import { STATIC_BUILD } from './env';
 
 type Mood = 'title' | 'castle' | 'library' | 'dungeon' | 'forest' | 'village' | 'lake' | 'ruins' | 'sanctum' | 'night' | 'combat' | 'boss' | 'silence';
 
@@ -87,13 +88,14 @@ class AudioEngine {
   }
 
   private async loadManifest(): Promise<void> {
+    if (STATIC_BUILD) return;
     try {
-      const res = await fetch('/audio/manifest.json');
+      const res = await fetch(new URL('audio/manifest.json', document.baseURI));
       if (!res.ok) return;
       this.manifest = await res.json();
       for (const [id, file] of Object.entries(this.manifest)) {
         try {
-          const buf = await (await fetch('/audio/' + file)).arrayBuffer();
+          const buf = await (await fetch(new URL('audio/' + file, document.baseURI))).arrayBuffer();
           this.assets.set(id, await this.ctx!.decodeAudioData(buf));
         } catch { /* файл отсутствует — останется синтез */ }
       }

@@ -17,6 +17,7 @@ function fmtDay(day: number, min: number): string {
 export function SaveLoad({ mode, onClose, onLoaded }: { mode: 'save' | 'load'; onClose: () => void; onLoaded?: () => void }) {
   const [saves, setSaves] = useState<SaveMeta[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const refresh = () => { void listSaves().then(setSaves); };
   useEffect(refresh, []);
   const bySlot = new Map((saves ?? []).map((s) => [s.slot, s]));
@@ -48,7 +49,9 @@ export function SaveLoad({ mode, onClose, onLoaded }: { mode: 'save' | 'load'; o
                   <button className="btn small primary" disabled={busy} onClick={async () => { setBusy(true); const ok = await continueGame(slot); setBusy(false); if (ok) onLoaded?.(); }}>Загрузить</button>
                 )}
                 {m && slot !== 'auto' && (
-                  <button className="btn small ghost danger" title="Удалить" onClick={async () => { if (confirm('Удалить сохранение?')) { await deleteSave(slot); refresh(); } }}>✕</button>
+                  confirmDel === slot
+                    ? <button className="btn small danger" onClick={async () => { setConfirmDel(null); await deleteSave(slot); refresh(); }}>Удалить?</button>
+                    : <button className="btn small ghost danger" title="Удалить сохранение" onClick={() => setConfirmDel(slot)}>✕</button>
                 )}
               </div>
             );
