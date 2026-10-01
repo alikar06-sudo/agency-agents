@@ -1,7 +1,7 @@
 // Проверка целостности контента: карты, связность, ссылки между данными.
 // Запуск: npm run validate
 import { ZONES } from '../src/data/zones';
-import { NPCS } from '../src/data/npcs';
+import { NPCS, VOICES } from '../src/data/npcs';
 import { DIALOGUES } from '../src/data/dialogues';
 import { QUESTS } from '../src/data/quests';
 import { ITEMS } from '../src/data/items';
@@ -130,7 +130,7 @@ for (const d of Object.values(DIALOGUES)) {
   if (!d.nodes[d.start]) err(`диалог ${d.id}: нет стартового узла ${d.start}`);
   for (const [nid, node] of Object.entries(d.nodes)) {
     if (node.next && !d.nodes[node.next]) err(`диалог ${d.id}.${nid}: next → ${node.next}`);
-    if (node.speaker && !['player', 'narrator', 'hollow', 'mirror'].includes(node.speaker) && !NPCS[node.speaker]) err(`диалог ${d.id}.${nid}: говорящий ${node.speaker}`);
+    if (node.speaker && node.speaker !== 'player' && !VOICES[node.speaker] && !NPCS[node.speaker]) err(`диалог ${d.id}.${nid}: говорящий ${node.speaker}`);
     checkEffects(node.effects, `${d.id}.${nid}`);
     for (const c of node.choices ?? []) {
       if (c.next && !d.nodes[c.next]) err(`диалог ${d.id}.${nid}: вариант → ${c.next}`);

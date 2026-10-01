@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGame } from '@/state/store';
-import { LORE, ACHIEVEMENTS, SUBJECTS, WEEKDAYS, CIRCLES } from '@/data/world';
+import { LORE, ACHIEVEMENTS, SUBJECTS, WEEKDAYS, CIRCLES, FOUNDER_MARKS } from '@/data/world';
 import { NPCS } from '@/data/npcs';
 import { dateString } from '@/systems/time';
 import { weekdayOf } from '@/systems/logic';
@@ -96,7 +96,7 @@ export function JournalTab() {
             <div className="k">Открыто сундуков</div><div className="v">{g.counters.chests ?? 0}</div>
             <div className="k">Собрано трав и руды</div><div className="v">{g.counters.harvested ?? 0}</div>
             <div className="k">Создано предметов</div><div className="v">{g.counters.crafted ?? 0}</div>
-            <div className="k">Знаков Основателей</div><div className="v">{g.counters.founder_marks ?? 0} / 8</div>
+            <div className="k">Знаков Основателей</div><div className="v">{g.counters.founder_marks ?? 0} / {FOUNDER_MARKS}</div>
             <div className="k">Заработано крон</div><div className="v">{g.counters.goldEarned ?? 0}</div>
             <div className="k">Потеряно сознание</div><div className="v">{g.counters.deaths ?? 0}</div>
             <div className="k">Пойман патрулём</div><div className="v">{Number(g.flags.times_caught ?? 0)}</div>

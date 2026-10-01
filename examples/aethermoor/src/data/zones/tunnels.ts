@@ -69,7 +69,7 @@ export const tunnels: ZoneDef = {
     'i': { kind: 'ore', id: 'ironstone', item: 'ironstone', floor: '.' },
     'q': { kind: 'ore', id: 'quartz', item: 'aether_quartz', floor: '.' },
     'e': { kind: 'herb', id: 'ember_cap', item: 'ember_cap', floor: '.' },
-    'J': { kind: 'secret', id: 'tunnel_wall', prop: 'wall', hidden: true, floor: '.' },
+    'J': { kind: 'secret', id: 'tunnel_wall', prop: 'wall', hidden: true, floor: '.', effects: [{ setFlag: 'tunnel_shortcut' }, { journal: 'За растворившейся стеной тоннель уходит к Шепчущему лесу. Короткий путь!' }] },
     '2': { kind: 'spawn', id: 'from_forest', floor: '.' },
     'F': { kind: 'exit', id: 'to_forest', to: 'forest', spawn: 'from_tunnels', label: 'Тайный ход в лес', floor: '.' },
     'M': { kind: 'secret', id: 'mark_tunnels', hidden: true, label: 'Знак Пламени', text: 'Перед Печатной дверью вспыхивает огненный знак Аэлы — будто предупреждение.', floor: '.' },

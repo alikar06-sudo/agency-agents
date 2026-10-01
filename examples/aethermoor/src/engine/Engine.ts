@@ -507,10 +507,10 @@ export class Engine {
       this.skyUniforms.uTop.value.copy(nightC.clone().lerp(new THREE.Color(0x4a78b8), d));
       this.skyUniforms.uHorizon.value.copy(fogC);
       this.skyUniforms.uNight.value = 1 - d;
-      const sunInt = (0.28 + d * 1.75) * (overcast ? 0.62 : 1);
+      const sunInt = (0.3 + d * 1.9) * (overcast ? 0.72 : 1);
       this.sun.intensity = sunInt;
       this.sun.color.copy(new THREE.Color(0x8aa0e0).lerp(new THREE.Color(0xfff2dc), d).lerp(new THREE.Color(0xffa060), dawn * 0.6));
-      this.hemi.intensity = (0.34 + d * 0.62) * (def.ambientLight ?? 1);
+      this.hemi.intensity = (0.4 + d * 0.9) * (def.ambientLight ?? 1);
       this.hemi.color.copy(new THREE.Color(0x3a4a7a).lerp(new THREE.Color(0xc8d8f0), d));
       this.hemi.groundColor.copy(new THREE.Color(0x14141c).lerp(new THREE.Color(0x5a5040), d));
       this.sun.castShadow = useSettings.getState().quality !== 'low';
@@ -526,10 +526,10 @@ export class Engine {
       this.sky.visible = false;
       const amb = def.ambientLight ?? 1;
       const dark = def.dark ? 0.12 : 1;
-      const themeAmb = def.theme === 'dungeon' ? 0.6 : def.theme === 'sanctum' ? 0.55 : def.theme === 'ruins' ? 0.7 : 0.95;
+      const themeAmb = def.theme === 'dungeon' ? 1.1 : def.theme === 'sanctum' ? 1.7 : def.theme === 'ruins' ? 0.8 : 0.95;
       this.hemi.intensity = themeAmb * amb * dark;
-      this.hemi.color.set(def.theme === 'sanctum' ? 0x4a5aa0 : def.theme === 'dungeon' ? 0x5a6080 : 0xc0a080);
-      this.hemi.groundColor.set(0x18120e);
+      this.hemi.color.set(def.theme === 'sanctum' ? 0x8090d8 : def.theme === 'dungeon' ? 0x8088a8 : 0xc0a080);
+      this.hemi.groundColor.set(def.theme === 'sanctum' ? 0x202848 : 0x18120e);
       // свет из окон днём
       this.sun.intensity = (0.35 + d * 0.7) * amb * dark * (def.theme === 'dungeon' || def.theme === 'sanctum' ? 0.35 : 1);
       this.sun.color.set(d > 0.3 ? 0xffe6c0 : 0x8090c0);

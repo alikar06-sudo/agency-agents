@@ -1,5 +1,6 @@
 // Интерактивные объекты мира: двери, сундуки, травы, станции, головоломки, тайники, печати, выходы.
 import * as THREE from 'three';
+import { FOUNDER_MARKS } from '@/data/world';
 import type { Engine } from './Engine';
 import type { BuiltZone, MarkerInstance } from './world';
 import { TS, cellCenter } from './world';
@@ -482,10 +483,10 @@ export class Interactable {
         bus.emit('sfx', { id: 'secret' });
         mutate((g) => { g.counters.founder_marks = (g.counters.founder_marks ?? 0) + 1; });
         const n = G().counters.founder_marks ?? 0;
-        toast('achievement', `Знак Основателей ${n} / 8`, d.text ?? 'Древний символ вспыхнул и угас.');
+        toast('achievement', `Знак Основателей ${n} / ${FOUNDER_MARKS}`, d.text ?? 'Древний символ вспыхнул и угас.');
         apply(d.effects);
         apply([{ xp: 40 }]);
-        if (n >= 8) apply([{ achievement: 'secrets' }]);
+        if (n >= FOUNDER_MARKS) apply([{ achievement: 'secrets' }]);
         this.obj.visible = false;
         return;
       }
@@ -559,6 +560,7 @@ export class Interactable {
     if (this.kind === 'secret' && this.m.def.prop === 'wall') {
       this.markOpened();
       toast('info', 'Тайный проход!', 'Стена растворилась в свете.');
+      apply(this.m.def.effects);
     }
     this.syncGrid();
     bus.emit('spellHitObject', { spell: 'reveal', object: this.key, kind: this.kind });
@@ -689,6 +691,8 @@ export class InteractManager {
     bus.on('flagSet', refresh);
     bus.on('questUpdated', refresh);
     bus.on('hourChanged', refresh);
+    bus.on('enemyKilled', () => setTimeout(refresh, 50));
+    bus.on('itemChanged', refresh);
   }
 
   circleColor(): string {

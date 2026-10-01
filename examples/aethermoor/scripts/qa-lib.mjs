@@ -74,3 +74,13 @@ export async function goto(page, zone, spawn = 'start') {
 export async function quest(page, id) {
   return page.evaluate((q) => { const s = window.__aether.G().quests[q]; return s ? { state: s.state, done: s.done } : null; }, id);
 }
+
+// Найти NPC по его текущему расписанию (перейти в нужную зону) и поговорить.
+export async function meet(page, npc, picks = []) {
+  const loc = await page.evaluate((n) => window.__aether.where(n), npc);
+  if (!loc) throw new Error('NPC сейчас нигде: ' + npc);
+  const cur = await page.evaluate(() => window.__aether.engine.zone?.def.id);
+  if (cur !== loc.zone) await goto(page, loc.zone, 'start');
+  await page.waitForTimeout(400);
+  await talk(page, npc, picks);
+}

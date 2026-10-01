@@ -1,7 +1,7 @@
 // Сборка зоны из ASCII-карты: пол, стены, декор, вода, маркеры, источники света, мини-карта.
 import * as THREE from 'three';
 import type { MarkerDef, ZoneDef } from '@/data/types';
-import { floorTexture, wallTexture, wallTopTexture, waterNormal, windowTexture, bannerTexture, signTexture } from './textures';
+import { floorTexture, wallTexture, wallTopTexture, roofTexture, waterNormal, windowTexture, bannerTexture, signTexture } from './textures';
 import type { FloorStyle, WallStyle } from './textures';
 import { withCutaway, colorMat, stdMat } from './materials';
 import { Batcher, buildProp, SOLID_PROPS, LOW_PROPS } from './props';
@@ -86,7 +86,7 @@ function wallStyleOf(def: ZoneDef): WallStyle {
     case 'ruins': return 'ruins';
     case 'sanctum': return 'sanctum';
     case 'village': return 'village';
-    case 'forest': return 'ruins';
+    case 'forest': return 'village';
     case 'lake': return 'ruins';
     default: return 'castle';
   }
@@ -109,7 +109,10 @@ function wallMaterials(style: WallStyle, height: number): THREE.Material[] {
   tex.repeat.set(1, height / TS);
   tex.needsUpdate = true;
   const side = withCutaway(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, color: 0xffffff }));
-  const top = withCutaway(new THREE.MeshStandardMaterial({ map: wallTopTexture(), roughness: 1, color: 0x6a6258 }));
+  // Верх стены: черепица у деревенских построек, светлый камень снаружи, тёмный «потолок» внутри замка.
+  const top = style === 'village'
+    ? withCutaway(new THREE.MeshStandardMaterial({ map: roofTexture(), roughness: 0.85, color: 0xffffff }))
+    : withCutaway(new THREE.MeshStandardMaterial({ map: wallTopTexture(), roughness: 1, color: style === 'ruins' || style === 'hedge' ? 0xb0a898 : 0x6a6258 }));
   m = [side, side, top, top, side, side];
   wallMatCache.set(key, m);
   return m;

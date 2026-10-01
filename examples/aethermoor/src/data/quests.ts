@@ -50,7 +50,7 @@ const list: QuestDef[] = [
       { id: 'transfig', kind: 'interact', target: 'glitch_transfig', text: 'Исследуйте сбой в классе трансформации (главный этаж)', where: { zone: 'hall', marker: 'glitch_transfig' } },
       { id: 'dungeon', kind: 'interact', target: 'glitch_dungeon', text: 'Исследуйте сбой в подземельях', where: { zone: 'dungeons', marker: 'glitch_dungeon' }, hint: 'Проход затянут паутиной — понадобится «Пламя».' },
       { id: 'tower', kind: 'cast', target: 'reveal@glitch_tower', text: 'Найдите невидимую руну на лестнице Башен («Откровение»)', where: { zone: 'towers', marker: 'glitch_tower' }, hint: '«Откровение» преподают на уроке древних рун. Круг Звезды знает его с первого дня.' },
-      { id: 'mira', kind: 'manual', text: 'Покажите фрагменты Мире', where: { zone: 'library', npc: 'mira' }, if: [{ item: 'rune_fragment', count: 3 }] },
+      { id: 'mira', kind: 'manual', text: 'Соберите три фрагмента и покажите их Мире', where: { zone: 'library', npc: 'mira' } },
     ],
     rewards: { xp: 400, gold: 40, circlePoints: 15 },
     next: 'mq_restricted',
@@ -205,12 +205,12 @@ const list: QuestDef[] = [
   },
   {
     id: 'sq_marks', title: 'Знаки Основателей', type: 'exploration',
-    summary: 'Основатели оставили по всей долине восемь скрытых знаков. «Откровение» проявит их. Говорят, тот, кто найдёт все, получит наследие Орина.',
+    summary: 'Основатели оставили по всей долине двенадцать скрытых знаков. «Откровение» проявит их. Говорят, тот, кто найдёт все, получит наследие Орина.',
     objectives: [
-      { id: 'find', kind: 'flag', target: 'all_marks', text: 'Найдите 8 знаков Основателей («Откровение» звенит рядом с тайной)' },
+      { id: 'find', kind: 'flag', target: 'all_marks', text: 'Найдите 12 знаков Основателей («Откровение» звенит рядом с тайной)' },
     ],
     rewards: { xp: 600, items: [{ id: 'founders_robe' }] },
-    onComplete: [{ learnSpell: 'starfall' }, { journal: 'Все восемь знаков найдены. Мантия Основателей легла мне на плечи, а в голове зазвучало заклинание звёздного дождя.' }],
+    onComplete: [{ learnSpell: 'starfall' }, { journal: 'Все двенадцать знаков найдены. Мантия Основателей легла мне на плечи, а в голове зазвучало заклинание звёздного дождя.' }],
   },
   {
     id: 'sq_kitten', title: 'Рыжий беглец', type: 'side', giver: 'fin', zone: 'village',

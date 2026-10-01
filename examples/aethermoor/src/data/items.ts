@@ -140,6 +140,8 @@ const list: ItemDef[] = [
     desc: 'Древний трактат о печатях Основателей.', value: 0 },
   { id: 'letter_home', name: 'Письмо для Марты', category: 'quest', rarity: 'common', icon: 'letter', color: '#e8dcc0', stack: 1, noSell: true,
     desc: 'Тоби просил передать письмо тётушке в деревню.', value: 0 },
+  { id: 'corvin_letter', name: 'Запечатанное письмо Корвина', category: 'quest', rarity: 'uncommon', icon: 'letter', color: '#6a7aa8', stack: 1, noSell: true, noDrop: true,
+    desc: 'Сургуч с руной Бастиона. «Архивариусу Элиасу. Лично». Корвин просил не читать.', value: 0 },
   { id: 'cult_letter', name: 'Письмо с подписью «П.»', category: 'quest', rarity: 'rare', icon: 'letter', color: '#8a6a6a', stack: 1, noSell: true, noDrop: true,
     desc: '«Порошок готов. Ученики спят крепко. Скоро третья печать. — П.»', value: 0 },
   { id: 'ash_sigil', name: 'Знак Ордена Пепла', category: 'quest', rarity: 'rare', icon: 'seal', color: '#a34a4a', stack: 1, noSell: true, noDrop: true,

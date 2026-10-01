@@ -233,11 +233,12 @@ export function applyOne(e: Effect): void {
   }
   if ('heal' in e) { hooks.heal(); return; }
   if ('journal' in e) {
-    mutate((g) => { g.journal.push({ day: g.time.day, text: e.journal }); });
-    toast('info', 'Запись в дневнике', e.journal.length > 60 ? e.journal.slice(0, 57) + '…' : e.journal);
+    const text = fmt(e.journal);
+    mutate((g) => { g.journal.push({ day: g.time.day, text }); });
+    toast('info', 'Запись в дневнике', text.length > 60 ? text.slice(0, 57) + '…' : text);
     return;
   }
-  if ('toast' in e) { toast('info', e.toast); return; }
+  if ('toast' in e) { toast('info', fmt(e.toast)); return; }
   if ('advanceTime' in e) { hooks.advanceTime(e.advanceTime); return; }
   if ('sleep' in e) { hooks.sleep(); return; }
   if ('script' in e) {

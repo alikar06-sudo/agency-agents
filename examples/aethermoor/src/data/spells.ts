@@ -61,7 +61,7 @@ const list: SpellDef[] = [
   { id: 'starfall', name: 'Звёздный дождь', incantation: 'Орин астра', school: 'secret', element: 'light', kind: 'zone',
     desc: 'С неба падают звёзды: огромный урон в области курсора.', world: 'Освещает всё вокруг на несколько мгновений.',
     cost: 35, cooldown: 15, level: 6, damage: 34, radius: 4, duration: 2.2, color: 0xfff0a0, color2: 0xa0c0ff, sound: 'starfall',
-    acquire: 'Скрытое. Найдите все восемь знаков Основателей.' },
+    acquire: 'Скрытое. Найдите все двенадцать знаков Основателей.' },
 ];
 
 export const SPELLS: Record<string, SpellDef> = Object.fromEntries(list.map((s) => [s.id, s]));

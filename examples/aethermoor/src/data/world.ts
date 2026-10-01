@@ -254,4 +254,4 @@ export const LORE: Record<string, { title: string; text: string }> = {
   heart: { title: 'Сердце Эфира', text: 'Кристалл в глубине скалы. Кто владеет им — владеет магией долины. Кто разобьёт его — освободит магию для всего мира, но лишит долину её чуда.' },
 };
 
-export const FOUNDER_MARKS = 8;
+export const FOUNDER_MARKS = 12;

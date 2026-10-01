@@ -83,6 +83,7 @@ const list: NpcDef[] = [
     ],
     overrides: [
       { if: [{ flag: 'shade_defeated' }, { notFlag: 'corvin_confronted' }], schedule: [{ from: 0, zone: 'hall', at: 'corridor_e', activity: 'Осматривает галерею' }] },
+      { if: [{ flag: 'ally_corvin' }, { flag: 'soren_challenge' }, { quest: 'mq_sanctum', is: 'active' }], schedule: [{ from: 0, zone: 'sanctum', at: 'ally_corvin', activity: 'Держит щит над вами' }] },
     ],
     dialogues: [
       { if: [{ objActive: ['mq_whispers', 'corvin'] }], id: 'corvin_confront', mark: true },
@@ -96,7 +97,7 @@ const list: NpcDef[] = [
     id: 'pellinor', name: 'Феликс Пеллинор', title: 'Мастер зельеварения', faction: 'academy', voice: 1.15,
     personality: 'Добродушный, шумный, обожает пироги и учеников. Слишком часто улыбается.',
     appearance: { skin: '#e8b898', hair: '#b8642a', hairStyle: 'curly', eyes: '#6a4a2a', robe: '#8a6a2a', trim: '#e0b860', beard: 'short', beardColor: '#a8582a', build: 1.35, height: 0.98, glasses: true },
-    presentIf: [{ notFlag: 'pellinor_gone' }],
+    presentIf: [{ notFlag: 'pellinor_gone' }, { notFlag: 'pellinor_fled' }],
     schedule: [
       { from: 0, zone: 'dungeons', at: 'pellinor_quarters', activity: 'sleep' },
       { from: 7, zone: 'hall', at: 'staff_4', activity: 'Завтрак' },
@@ -107,6 +108,7 @@ const list: NpcDef[] = [
       { from: 21, zone: 'dungeons', at: 'storeroom_door', activity: '«Проверяет запасы»' },
     ],
     overrides: [
+      { if: [{ flag: 'ally_pellinor' }, { flag: 'soren_challenge' }, { quest: 'mq_sanctum', is: 'active' }], schedule: [{ from: 0, zone: 'sanctum', at: 'ally_pellinor', activity: 'Варит зелья для вас' }] },
       { if: [{ flag: 'pellinor_spared' }], schedule: [{ from: 0, zone: 'hall', at: 'nurse_post', activity: 'Под присмотром сестры Мэйбел' }] },
     ],
     dialogues: [
@@ -241,6 +243,7 @@ const list: NpcDef[] = [
     appearance: { skin: '#f2d2bc', hair: '#8a5a32', hairStyle: 'curly', eyes: '#6a4a2a', robe: '#1e1a22', trim: '#e3c46b', height: 0.9 },
     schedule: studentDay('gh_seat_1', 'reading_table', 'library', 'corridor_w', 'hall', 'star_dorm'),
     overrides: [
+      { if: [{ flag: 'mira_rescued' }, { notFlag: 'game_ended' }, { quest: 'mq_sanctum', is: 'active' }], schedule: [{ from: 0, zone: 'sanctum', at: 'mira_chains', activity: 'Рядом с вами' }] },
       { if: [{ objActive: ['mq_arrival', 'mira'] }], schedule: [{ from: 0, zone: 'gates', at: 'arrival_meet', activity: 'Ждёт у ворот' }] },
       { if: [{ objActive: ['mq_whispers', 'library'] }], schedule: [{ from: 0, zone: 'library', at: 'reading_table', activity: 'Ждёт вас в библиотеке' }] },
       { if: [{ objActive: ['rq_mira', 'stars'] }], schedule: [{ from: 0, zone: 'towers', at: 'common_room', activity: 'Гостиная' }, { from: 20, zone: 'towers', at: 'balcony', activity: 'Смотрит на звёзды' }, { from: 24, zone: 'towers', at: 'star_dorm', activity: 'sleep' }] },
@@ -249,7 +252,7 @@ const list: NpcDef[] = [
     dialogues: [
       { if: [{ objActive: ['mq_arrival', 'mira'] }], id: 'mira_arrival', mark: true },
       { if: [{ objActive: ['mq_whispers', 'library'] }], id: 'mira_library', mark: true },
-      { if: [{ objActive: ['mq_glitches', 'mira'] }], id: 'mira_fragments', mark: true },
+      { if: [{ objActive: ['mq_glitches', 'mira'] }, { item: 'rune_fragment', count: 3 }], id: 'mira_fragments', mark: true },
       { if: [{ objActive: ['mq_restricted', 'mira'] }], id: 'mira_restricted', mark: true },
       { if: [{ objActive: ['mq_restricted', 'decode'] }], id: 'mira_decode', mark: true },
       { if: [{ objActive: ['mq_restricted', 'reveal'] }], id: 'mira_seals', mark: true },
@@ -290,6 +293,7 @@ const list: NpcDef[] = [
     presentIf: [{ notFlag: 'cassian_left' }],
     schedule: studentDay('gh_seat_2', 'corridor_e', 'hall', 'arrival_meet', 'gates', 'bastion_dorm'),
     overrides: [
+      { if: [{ flag: 'ally_cassian' }, { flag: 'soren_challenge' }, { quest: 'mq_sanctum', is: 'active' }], schedule: [{ from: 0, zone: 'sanctum', at: 'ally_cassian', activity: 'Сражается рядом' }] },
       { if: [{ objActive: ['mq_arrival', 'mira'] }], schedule: [{ from: 0, zone: 'gates', at: 'gate_post', activity: 'Скучает у ворот' }] },
       { if: [{ objActive: ['mq_night_of_ash', 'cassian'] }], schedule: [{ from: 0, zone: 'gates', at: 'fountain_side', activity: 'Стоит у фонтана' }] },
     ],
@@ -480,5 +484,6 @@ export const NPCS: Record<string, NpcDef> = Object.fromEntries(list.map((n) => [
 export const VOICES: Record<string, { name: string; title: string }> = {
   hollow: { name: 'Голос из-под камня', title: '' },
   mirror: { name: 'Зеркало Кругов', title: '' },
+  lake_queen: { name: 'Владычица озера', title: 'Дух Зеркального озера' },
   narrator: { name: '', title: '' },
 };

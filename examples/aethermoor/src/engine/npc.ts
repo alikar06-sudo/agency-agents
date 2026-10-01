@@ -126,9 +126,20 @@ export class NpcManager {
 
   constructor(private eng: Engine) {
     bus.on('hourChanged', () => { if (this.eng.zone) this.syncZone(false); });
-    bus.on('questUpdated', () => { this.markT = 0; });
-    bus.on('flagSet', () => { this.markT = 0; });
+    // Сюжетные флаги и задания меняют расписания (переопределения) — пересобираем состав NPC.
+    bus.on('questUpdated', () => { this.markT = 0; this.queueSync(); });
+    bus.on('flagSet', () => { this.markT = 0; this.queueSync(); });
     bus.on('dialogueEnded', () => { this.eng.focus = null; this.markT = 0; });
+  }
+
+  private syncQueued = false;
+  private queueSync(): void {
+    if (this.syncQueued) return;
+    this.syncQueued = true;
+    setTimeout(() => {
+      this.syncQueued = false;
+      if (this.eng.zone && !this.eng.loading) this.syncZone(false);
+    }, 120);
   }
 
   anchorPos(key: string): { x: number; z: number } | null {

@@ -107,8 +107,9 @@ export class PlayerEntity {
     this.light.x = this.x;
     this.light.z = this.z;
     this.light.y = lit ? 3.2 : 2.2;
-    this.light.intensity = lit ? 2.8 : this.eng.zone?.def.dark ? 0.9 : 0.55;
-    this.light.distance = lit ? 17 : this.eng.zone?.def.dark ? 7 : 6;
+    const deep = this.eng.zone?.def.dark || this.eng.zone?.def.theme === 'sanctum' || this.eng.zone?.def.theme === 'dungeon';
+    this.light.intensity = lit ? 2.8 : deep ? 1.3 : 0.55;
+    this.light.distance = lit ? 17 : deep ? 9 : 6;
     this.light.color = lit ? 0xfff0c0 : 0xffd9a0;
     return this.light;
   }

@@ -127,6 +127,30 @@ export function wallTopTexture(): THREE.Texture {
   return finish(c, key);
 }
 
+// Черепичная кровля для деревенских домов и хижин (верх стен в стиле village).
+export function roofTexture(): THREE.Texture {
+  const key = 'roof';
+  if (cache.has(key)) return cache.get(key)!;
+  const [c, ctx] = canvas(128, 128);
+  const r = rng(77);
+  ctx.fillStyle = '#4a2a20';
+  ctx.fillRect(0, 0, 128, 128);
+  const rowsN = 8, colsN = 6, rh = 128 / rowsN, cw = 128 / colsN;
+  for (let y = 0; y < rowsN; y++) {
+    for (let x = -1; x < colsN; x++) {
+      const ox = (y % 2) * cw / 2;
+      const v = 0.75 + r() * 0.35;
+      ctx.fillStyle = `rgb(${Math.round(132 * v)},${Math.round(64 * v)},${Math.round(48 * v)})`;
+      ctx.beginPath();
+      ctx.roundRect(x * cw + ox + 1, y * rh + 1, cw - 2, rh - 1, [0, 0, 6, 6]);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(x * cw + ox + 1, y * rh + rh - 3, cw - 2, 2);
+    }
+  }
+  return finish(c, key);
+}
+
 export type FloorStyle =
   | 'stone' | 'flag' | 'wood' | 'carpet' | 'grass' | 'dirt' | 'cobble' | 'sand' | 'dungeon' | 'ruins' | 'sanctum' | 'snow' | 'marble';
 
