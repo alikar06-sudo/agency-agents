@@ -289,9 +289,9 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
     return null;
   };
   const winTex = windowTexture();
-  const windowMat = stdMat('windowpane', () => new THREE.MeshStandardMaterial({ map: winTex, emissiveMap: winTex, emissive: 0xffffff, emissiveIntensity: 1, color: 0x222222, roughness: 0.3, transparent: false }));
-  const torchMetal = colorMat(0x2a2420, { metal: 0.6, rough: 0.5 });
-  const flameMat = stdMat('torchflame', () => new THREE.MeshBasicMaterial({ color: 0xffb050 }));
+  const windowMat = stdMat('windowpane', () => withCutaway(new THREE.MeshStandardMaterial({ map: winTex, emissiveMap: winTex, emissive: 0xffffff, emissiveIntensity: 1, color: 0x222222, roughness: 0.3, transparent: false })));
+  const torchMetal = colorMat(0x2a2420, { metal: 0.6, rough: 0.5, cut: true });
+  const flameMat = stdMat('torchflame', () => withCutaway(new THREE.MeshBasicMaterial({ color: 0xffb050 })));
   let bannerIdx = 0;
   for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
     const ch = charAt(c, r);
@@ -316,7 +316,7 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
       const ids = Object.values(CIRCLES);
       const circle = ids[bannerIdx++ % ids.length];
       const tex = bannerTexture(circle.color, circle.trim, bannerIdx % 4 === 0 ? 3 : (bannerIdx - 1) % 4);
-      const banner = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.2), stdMat('banner_' + circle.color, () => new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.3, roughness: 0.9, side: THREE.DoubleSide })));
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.2), stdMat('banner_' + circle.color, () => withCutaway(new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.3, roughness: 0.9, side: THREE.DoubleSide }))));
       banner.position.set(fx, 2.2, fz);
       banner.rotation.y = ry;
       group.add(banner);
@@ -325,13 +325,18 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
 
   // Освещённые окна на высоких стенах фасада.
   if (tall.length) {
-    const winGlow = stdMat('facadewin', () => new THREE.MeshBasicMaterial({ color: 0xffc070 }));
+    // Ряды стрельчатых окон по сетке: каменная рама, тёплое стекло или тёмное (незажжённое).
+    const winGlow = stdMat('facadewin', () => withCutaway(new THREE.MeshBasicMaterial({ color: 0xffc070 })));
+    const winDark = colorMat(0x1a2030, { rough: 0.3, metal: 0.2, cut: true });
+    const winFrame = colorMat(0x4a443c, { rough: 0.95, cut: true });
     for (const [c, r] of tall) {
-      if (isWallCh(charAt(c, r + 1))) continue;
+      if (isWallCh(charAt(c, r + 1)) || c % 2 !== 0) continue;
       const [x, z] = cellCenter(c, r);
-      for (let k = 0; k < 2; k++) {
-        if (rnd() < 0.35) continue;
-        batch.add('facadewin', SG.box, winGlow, [x + (rnd() - 0.5) * 1.0, 4 + rnd() * 5, z + TS / 2 + 0.02], [0.35, 0.6, 0.04], [0, 0, 0], undefined, false);
+      for (const y of [5.2, 8.6]) {
+        const lit = rnd() < 0.62;
+        batch.add('facadeframe', SG.box, winFrame, [x, y, z + TS / 2 + 0.04], [0.7, 1.35, 0.08], [0, 0, 0]);
+        batch.add(lit ? 'facadewin' : 'facadewindark', SG.box, lit ? winGlow : winDark, [x, y - 0.05, z + TS / 2 + 0.09], [0.46, 1.05, 0.04], [0, 0, 0], undefined, false);
+        batch.add('facadesill', SG.box, winFrame, [x, y - 0.68, z + TS / 2 + 0.12], [0.8, 0.1, 0.18], [0, 0, 0]);
       }
     }
   }

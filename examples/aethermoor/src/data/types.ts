@@ -353,6 +353,7 @@ export interface MarkerDef {
   group?: string;          // группа головоломки
   facing?: number;
   radius?: number;
+  power?: number;          // сила света для kind: light
   prop?: string;           // визуальная модель для interact
   deco?: string;           // символ декоративного пропа, который строится под маркером (без блокировки)
   dialogue?: string;

@@ -301,7 +301,7 @@ export class Interactable {
       case 'light': {
         const cr = new THREE.Mesh(SG.ico, new THREE.MeshBasicMaterial({ color: d.color ?? 0x8ad8ff })); cr.scale.setScalar(0.25); cr.position.y = 1.8; o.add(cr);
         this.glow = sprite(d.color ?? 0x8ad8ff, 2.2); this.glow.position.y = 1.8; o.add(this.glow);
-        this.mgr.zone!.lights.push({ x: this.x, y: 1.8, z: this.z, color: d.color ?? 0x8ad8ff, intensity: 1.6, distance: 10, flicker: 0.05, kind: 'crystal' });
+        this.mgr.zone!.lights.push({ x: this.x, y: 1.8, z: this.z, color: d.color ?? 0x8ad8ff, intensity: d.power ?? 1.6, distance: d.prop === 'candles' ? 10 : (d.radius ?? 10), flicker: 0.05, kind: 'crystal' });
         if (d.prop === 'candles') this.buildFloatingCandles(d.radius ?? 6);
         if (d.prop === 'fireplace') {
           cr.visible = false;

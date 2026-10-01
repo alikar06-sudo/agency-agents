@@ -19,7 +19,7 @@ export function exposeDebug(): void {
     useUI,
     winMinigame: (score = 1) => { const r = ui().minigame; if (r) finishMinigame(r, score); },
     goto: (zone: ZoneId, spawn = 'start') => engine.enterZone(zone, spawn),
-    tp: (x: number, z: number) => { engine.player.x = x; engine.player.z = z; },
+    tp: (x: number, z: number) => { engine.player.x = x; engine.player.z = z; engine.snapCamera(); },
     near: (npc: string) => { const n = engine.npcs.find(npc); if (n) { engine.player.x = n.x + 1.2; engine.player.z = n.z + 0.6; return true; } return false; },
     // Встать рядом с маркером зоны (по ключу или id).
     toMarker: (key: string) => {
@@ -27,6 +27,7 @@ export function exposeDebug(): void {
       if (!m) return false;
       const sp = engine.findSpawn(m.key);
       engine.player.x = sp.x; engine.player.z = sp.z;
+      engine.snapCamera();
       return true;
     },
     // Использовать интерактивный объект так же, как по клавише E.
