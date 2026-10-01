@@ -11,6 +11,7 @@ import { initSaves, loadSave, saveGame, autosave } from '@/systems/save';
 import { createGameState } from '@/state/gameState';
 import type { GameState, NewCharacter } from '@/state/gameState';
 import { G, hasGame, mutate, setGame, setUI, toast, ui, useSettings } from '@/state/store';
+import { setBindings } from '@/core/input';
 import { engine } from '@/engine/Engine';
 import { audio } from '@/core/audio';
 import { bus } from '@/core/bus';
@@ -82,6 +83,8 @@ export function bootGame(): void {
   void initSaves();
   const syncVol = () => audio.setVolumes(useSettings.getState());
   useSettings.subscribe(syncVol);
+  setBindings(useSettings.getState().keys as never);
+  useSettings.subscribe((st, prev) => { if (st.keys !== prev.keys) setBindings(st.keys as never); });
   syncVol();
   bus.on('sfx', (e) => audio.play(e.id, { x: e.x, z: e.z, volume: e.volume, pitch: e.pitch }));
   bus.on('hourChanged', (e) => {

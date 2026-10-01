@@ -1,3 +1,5 @@
+import { boundKey } from '@/core/input';
+import type { Action } from '@/core/input';
 import { useUI, setUI } from '@/state/store';
 import type { MenuTab } from '@/state/store';
 import { Icon } from '../icons';
@@ -31,7 +33,7 @@ export function GameMenu() {
         <div className="tabs">
           {TABS.map((t) => (
             <button key={t.id} className={'tab' + (menu === t.id ? ' on' : '')} onClick={() => { setUI({ menu: t.id }); bus.emit('sfx', { id: 'page' }); }}>
-              <Icon name={t.icon} size={18} />{t.name}{t.key && <span className="kbd">{t.key}</span>}
+              <Icon name={t.icon} size={18} />{t.name}{t.key && <span className="kbd">{boundKey(t.id as Action)}</span>}
             </button>
           ))}
           <button className="tab-close" onClick={close} title="Закрыть (Esc)">✕</button>

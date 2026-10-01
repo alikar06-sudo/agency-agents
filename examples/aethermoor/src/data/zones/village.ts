@@ -11,7 +11,7 @@ export const village: ZoneDef = {
   ambient: ['wind', 'crowd', 'water'],
   floor: ',',
   fog: [24, 76],
-  mapPos: [0.5, 0.82],
+  mapPos: [0.5, 0.86],
   waystone: 'waystone',
   unlock: [{ act: 2 }],
   lockedText: 'Первокурсникам разрешено ходить в деревню только после первой недели учёбы.',

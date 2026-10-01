@@ -66,19 +66,32 @@ export function MapTab() {
         const x = col * S * K + S * K / 2, y = r * S * K + S * K / 2;
         if (m.kind === 'exit') {
           ctx.fillStyle = '#e3c46b'; ctx.fillRect(x - 6, y - 6, 12, 12);
-          ctx.font = 'bold 22px Georgia'; ctx.fillStyle = '#f5dc95'; ctx.textAlign = 'center';
-          ctx.fillText(m.label ?? ZONES[m.to!]?.name ?? '', x, y - 14);
+          ctx.font = 'bold 22px Georgia'; ctx.fillStyle = '#f5dc95';
+          const label = m.label ?? ZONES[m.to!]?.name ?? '';
+          const tw = ctx.measureText(label).width;
+          // подпись не выходит за края плана
+          const lx = Math.max(tw / 2 + 4, Math.min(c.width - tw / 2 - 4, x));
+          const ly = y - 14 < 24 ? y + 34 : y - 14;
+          ctx.textAlign = 'center';
+          ctx.fillText(label, lx, ly);
         } else if (m.kind === 'waystone') { ctx.fillStyle = '#8ad8ff'; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill(); }
         else if (m.kind === 'station' || m.kind === 'board' || m.kind === 'bed') { ctx.fillStyle = '#c8a8ff'; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); }
       }
     });
     if (sel === here) {
+      const placed: [number, number, number][] = [];
       for (const n of engine.npcs.list) {
         const [x, y] = pt(n.x, n.z);
         ctx.fillStyle = n.mark ? '#ffd34a' : '#e8e0d0';
         ctx.beginPath(); ctx.arc(x, y, n.mark ? 8 : 6, 0, Math.PI * 2); ctx.fill();
         ctx.font = '18px Georgia'; ctx.fillStyle = '#e8e0d0'; ctx.textAlign = 'center';
-        ctx.fillText(n.def.name.split(' ')[0], x, y + 24);
+        const name = n.def.name.split(' ')[0];
+        const tw = ctx.measureText(name).width;
+        // разводим подписи стоящих рядом NPC
+        let ly = y + 24;
+        while (placed.some(([px, py, pw]) => Math.abs(px - x) < (pw + tw) / 2 + 4 && Math.abs(py - ly) < 20)) ly += 20;
+        placed.push([x, ly, tw]);
+        ctx.fillText(name, x, ly);
       }
       const [px, pz] = pt(engine.player.x, engine.player.z);
       ctx.fillStyle = '#fff'; ctx.strokeStyle = '#e3c46b'; ctx.lineWidth = 4;
@@ -109,7 +122,7 @@ export function MapTab() {
               <radialGradient id="wm-glow"><stop offset="0%" stopColor="#ffd34a" stopOpacity="0.8" /><stop offset="100%" stopColor="#ffd34a" stopOpacity="0" /></radialGradient>
             </defs>
             <path d="M5 70 Q20 55 30 62 T55 58 T80 66 T98 60" stroke="#2a3a2a" strokeWidth="9" fill="none" opacity="0.6" />
-            <ellipse cx="22" cy="78" rx="14" ry="8" fill="#1a3040" opacity="0.8" />
+            <ellipse cx="16" cy="68" rx="13" ry="8" fill="#1a3040" opacity="0.8" />
             {links().map(([a, b]) => {
               const A = ZONES[a].mapPos, B = ZONES[b].mapPos;
               return <line key={a + b} x1={A[0] * 100} y1={A[1] * 100} x2={B[0] * 100} y2={B[1] * 100} stroke="#6a5a3a" strokeWidth="0.6" strokeDasharray="1.5 1" />;

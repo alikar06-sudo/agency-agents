@@ -11,7 +11,7 @@ export const towers: ZoneDef = {
   ambient: ['fire'],
   floor: '.',
   fog: [16, 54],
-  mapPos: [0.64, 0.3],
+  mapPos: [0.68, 0.18],
   map: [
     '######o############|##|##########|#|####',
     '#=b======b==#..#BBB----BBB#..#B.......B#',

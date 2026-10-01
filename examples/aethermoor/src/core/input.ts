@@ -13,6 +13,70 @@ export const KEYMAP: Record<string, Action> = {
   KeyR: 'relations', KeyL: 'journal', Escape: 'menu', KeyT: 'wait',
 };
 
+// Переназначаемые действия: основная клавиша по умолчанию и подпись в настройках.
+export const REBINDABLE: { action: Action; name: string; def: string }[] = [
+  { action: 'up', name: 'Вперёд', def: 'KeyW' },
+  { action: 'down', name: 'Назад', def: 'KeyS' },
+  { action: 'left', name: 'Влево', def: 'KeyA' },
+  { action: 'right', name: 'Вправо', def: 'KeyD' },
+  { action: 'sprint', name: 'Бег', def: 'ShiftLeft' },
+  { action: 'dodge', name: 'Кувырок', def: 'Space' },
+  { action: 'interact', name: 'Взаимодействие', def: 'KeyE' },
+  { action: 'potion', name: 'Быстрое зелье', def: 'KeyQ' },
+  { action: 'spell1', name: 'Заклинание 1', def: 'Digit1' },
+  { action: 'spell2', name: 'Заклинание 2', def: 'Digit2' },
+  { action: 'spell3', name: 'Заклинание 3', def: 'Digit3' },
+  { action: 'spell4', name: 'Заклинание 4', def: 'Digit4' },
+  { action: 'spell5', name: 'Заклинание 5', def: 'Digit5' },
+  { action: 'spell6', name: 'Заклинание 6', def: 'Digit6' },
+  { action: 'character', name: 'Персонаж', def: 'KeyC' },
+  { action: 'inventory', name: 'Инвентарь', def: 'KeyI' },
+  { action: 'spells', name: 'Заклинания', def: 'KeyK' },
+  { action: 'quests', name: 'Задания', def: 'KeyJ' },
+  { action: 'map', name: 'Карта', def: 'KeyM' },
+  { action: 'relations', name: 'Отношения', def: 'KeyR' },
+  { action: 'journal', name: 'Дневник', def: 'KeyL' },
+  { action: 'wait', name: 'Ожидание', def: 'KeyT' },
+];
+
+const SPECIAL: Record<string, string> = {
+  Space: 'Пробел', ShiftLeft: 'Shift', ShiftRight: 'Shift (пр.)', ControlLeft: 'Ctrl', ControlRight: 'Ctrl (пр.)', AltLeft: 'Alt', AltRight: 'Alt (пр.)',
+  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Tab: 'Tab', Enter: 'Enter', Backquote: '`', Minus: '-', Equal: '=',
+  BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\', CapsLock: 'Caps',
+};
+export function keyName(code: string): string {
+  if (SPECIAL[code]) return SPECIAL[code];
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Numpad')) return 'Num ' + code.slice(6);
+  return code;
+}
+
+let effective: Record<string, Action> = { ...KEYMAP };
+let customKeys: Partial<Record<Action, string>> = {};
+
+// Применить пользовательские назначения поверх стандартной раскладки.
+export function setBindings(custom: Partial<Record<Action, string>> | undefined): void {
+  const map: Record<string, Action> = { ...KEYMAP };
+  customKeys = { ...(custom ?? {}) };
+  for (const r of REBINDABLE) {
+    const code = custom?.[r.action];
+    if (!code || code === r.def) continue;
+    if (map[r.def] === r.action) delete map[r.def];
+    map[code] = r.action;
+  }
+  effective = map;
+}
+
+// Текущая основная клавиша действия (для подсказок в интерфейсе).
+export function boundKey(action: Action): string {
+  const custom = customKeys[action];
+  if (custom && effective[custom] === action) return keyName(custom);
+  const r = REBINDABLE.find((x) => x.action === action);
+  const code = Object.keys(effective).find((c) => effective[c] === action && (!r || c === r.def)) ?? Object.keys(effective).find((c) => effective[c] === action);
+  return code ? keyName(code) : '—';
+}
+
 export const KEY_LABELS: { action: string; keys: string }[] = [
   { action: 'Движение', keys: 'W A S D / стрелки' },
   { action: 'Бег', keys: 'Shift' },
@@ -47,14 +111,14 @@ class Input {
     const onKeyDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      const a = KEYMAP[e.code];
+      const a = effective[e.code];
       if (!a) return;
       if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
       if (!this.down.has(a)) { this.pressed.add(a); for (const h of this.actionHandlers) h(a); }
       this.down.add(a);
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      const a = KEYMAP[e.code];
+      const a = effective[e.code];
       if (a) this.down.delete(a);
     };
     const onMove = (e: PointerEvent) => {

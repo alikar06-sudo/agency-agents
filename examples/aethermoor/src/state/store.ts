@@ -152,6 +152,7 @@ export interface Settings {
   touch: 'auto' | 'on' | 'off';
   shake: boolean;
   minimapRotate: boolean;
+  keys: Partial<Record<string, string>>;   // переназначенные клавиши: действие → код клавиши
 }
 
 const SETTINGS_KEY = 'aethermoor.settings.v1';
@@ -159,7 +160,7 @@ const SETTINGS_KEY = 'aethermoor.settings.v1';
 function loadSettings(): Settings {
   const def: Settings = {
     master: 0.8, music: 0.55, sfx: 0.8, ambient: 0.6, quality: 'medium', showDamage: true,
-    textSpeed: 60, zoom: 1, touch: 'auto', shake: true, minimapRotate: false,
+    textSpeed: 60, zoom: 1, touch: 'auto', shake: true, minimapRotate: false, keys: {},
   };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);

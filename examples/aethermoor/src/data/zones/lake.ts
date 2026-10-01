@@ -11,7 +11,7 @@ export const lake: ZoneDef = {
   ambient: ['wind', 'water'],
   floor: ',',
   fog: [24, 80],
-  mapPos: [0.2, 0.72],
+  mapPos: [0.16, 0.62],
   waystone: 'waystone',
   unlock: [{ any: [{ act: 3 }, { quest: 'sq_flight', is: 'active' }] }],
   lockedText: 'Тропу к озеру сторожит Ульрих: «Нечего первокурсникам у воды делать». Позже.',

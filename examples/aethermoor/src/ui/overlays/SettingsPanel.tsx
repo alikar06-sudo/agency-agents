@@ -1,7 +1,8 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useSettings, setSettings, useUI } from '@/state/store';
 import type { Settings } from '@/state/store';
-import { KEY_LABELS } from '@/core/input';
+import { KEY_LABELS, REBINDABLE, keyName, boundKey } from '@/core/input';
+import type { Action } from '@/core/input';
 
 function Slider({ k, label }: { k: keyof Settings; label: string }) {
   const v = useSettings((s) => s[k]) as number;
@@ -62,14 +63,62 @@ export function SettingsPanel() {
         </div>
       </div>
       <div className="divider">Управление</div>
+      <KeyBindings />
+      <div className="faint" style={{ fontSize: 13, margin: '12px 0 6px' }}>Мышь и прочее</div>
       <div className="kv" style={{ maxWidth: 520 }}>
-        {KEY_LABELS.map((k) => (<Fragment key={k.action}><div className="k">{k.action}</div><div className="v"><span className="kbd">{k.keys}</span></div></Fragment>))}
+        {KEY_LABELS.filter((k) => /ЛКМ|ПКМ|Esc|стрелки/.test(k.keys)).map((k) => (<Fragment key={k.action}><div className="k">{k.action}</div><div className="v"><span className="kbd">{k.keys}</span></div></Fragment>))}
       </div>
       <div className="divider">Сохранения</div>
       <div className="dim" style={{ fontSize: 14, lineHeight: 1.5 }}>
         {cloud === 'online'
           ? 'Сервер Академии на связи: каждое сохранение дублируется в облако (server/data) под вашим гостевым профилем.'
           : 'Сервер не запущен — сохранения хранятся только в этом браузере (localStorage). Запустите `npm start`, чтобы включить облачную копию.'}
+      </div>
+    </div>
+  );
+}
+
+// Переназначение клавиш: нажмите «Изменить», затем нужную клавишу (Esc — отмена).
+function KeyBindings() {
+  const keys = useSettings((st) => st.keys);
+  const [wait, setWait] = useState<Action | null>(null);
+  useEffect(() => {
+    if (!wait) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code !== 'Escape') {
+        const next: Record<string, string> = { ...(keys as Record<string, string>) };
+        // клавиша уже занята другим действием — возвращаем тому действию его стандартную
+        for (const r of REBINDABLE) if (r.action !== wait && (next[r.action] ?? r.def) === e.code) next[r.action] = r.def === e.code ? '' : r.def;
+        next[wait] = e.code;
+        for (const k of Object.keys(next)) if (!next[k]) delete next[k];
+        setSettings({ keys: next });
+      }
+      setWait(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [wait, keys]);
+  const custom = Object.keys(keys).length > 0;
+  return (
+    <div>
+      <div className="keybinds">
+        {REBINDABLE.map((r) => {
+          const code = keys[r.action] ?? r.def;
+          return (
+            <div key={r.action} className={'keybind' + (wait === r.action ? ' wait' : '')}>
+              <span className="dim">{r.name}</span>
+              <button className="btn small" onClick={() => setWait(wait === r.action ? null : r.action)} title="Изменить клавишу">
+                {wait === r.action ? 'Нажмите клавишу…' : keyName(code)}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10 }}>
+        <button className="btn small" disabled={!custom} onClick={() => setSettings({ keys: {} })}>Вернуть стандартные</button>
+        <span className="faint" style={{ fontSize: 13 }}>Стрелки всегда дублируют движение. Сейчас взаимодействие: {boundKey('interact')}</span>
       </div>
     </div>
   );

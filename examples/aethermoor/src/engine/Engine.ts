@@ -16,7 +16,7 @@ import { NpcManager } from './npc';
 import { EnemyEntity } from './enemy';
 import { Combat } from './combat';
 import { InteractManager } from './interact';
-import { input } from '@/core/input';
+import { input, boundKey } from '@/core/input';
 import { audio } from '@/core/audio';
 import type { Mood } from '@/core/audio';
 import { bus } from '@/core/bus';
@@ -706,7 +706,8 @@ export class Engine {
     const near = this.nearestUsable();
     const cur = ui().prompt;
     if (!near) { if (cur) setUI({ prompt: null }); return; }
-    if (!cur || cur.text !== near.text || cur.sub !== near.sub) setUI({ prompt: { text: near.text, sub: near.sub, key: 'E' } });
+    const k = boundKey('interact');
+    if (!cur || cur.text !== near.text || cur.sub !== near.sub || cur.key !== k) setUI({ prompt: { text: near.text, sub: near.sub, key: k } });
   }
 
   nearestUsable(): { text: string; sub?: string; use: () => void } | null {

@@ -11,7 +11,7 @@ export const library: ZoneDef = {
   ambient: ['fire'],
   floor: '=',
   fog: [16, 50],
-  mapPos: [0.36, 0.3],
+  mapPos: [0.32, 0.18],
   map: [
     '######################################',
     '##..B...B...B...B...B...B...B...B...##',

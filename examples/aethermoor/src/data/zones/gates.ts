@@ -11,7 +11,7 @@ export const gates: ZoneDef = {
   ambient: ['wind'],
   floor: ',',
   fog: [22, 72],
-  mapPos: [0.5, 0.52],
+  mapPos: [0.5, 0.5],
   waystone: 'waystone',
   map: [
     'HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',

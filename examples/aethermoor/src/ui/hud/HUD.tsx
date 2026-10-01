@@ -1,3 +1,4 @@
+import { boundKey } from '@/core/input';
 import { useEffect, useRef, useState } from 'react';
 import { useGame, useUI, setUI, G } from '@/state/store';
 import { derived, xpToNext } from '@/systems/player';
@@ -138,13 +139,13 @@ function MenuButtons() {
   );
   return (
     <div className="hud-menu">
-      {btn('character', 'person', 'Персонаж (C)', sp || undefined)}
-      {btn('inventory', 'bag', 'Инвентарь (I)')}
-      {btn('spells', 'spellbook', 'Заклинания (K)')}
-      {btn('quests', 'quest', 'Задания (J)')}
-      {btn('map', 'mapicon', 'Карта (M)')}
-      {btn('journal', 'journal', 'Дневник (L)')}
-      <button title="Ожидание (T)" onClick={() => setUI({ waitMenu: true })}><Icon name="hourglass" size={20} color="#e3c46b" /></button>
+      {btn('character', 'person', `Персонаж (${boundKey('character')})`, sp || undefined)}
+      {btn('inventory', 'bag', `Инвентарь (${boundKey('inventory')})`)}
+      {btn('spells', 'spellbook', `Заклинания (${boundKey('spells')})`)}
+      {btn('quests', 'quest', `Задания (${boundKey('quests')})`)}
+      {btn('map', 'mapicon', `Карта (${boundKey('map')})`)}
+      {btn('journal', 'journal', `Дневник (${boundKey('journal')})`)}
+      <button title={`Ожидание (${boundKey('wait')})`} onClick={() => setUI({ waitMenu: true })}><Icon name="hourglass" size={20} color="#e3c46b" /></button>
       <button title="Меню (Esc)" onClick={() => setUI({ pauseMenu: true })}><Icon name="gear" size={20} color="#e3c46b" /></button>
     </div>
   );

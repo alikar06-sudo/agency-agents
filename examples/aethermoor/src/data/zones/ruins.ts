@@ -13,7 +13,7 @@ export const ruins: ZoneDef = {
   fog: [18, 60],
   wallHeight: 2.6,
   ambientLight: 0.8,
-  mapPos: [0.9, 0.3],
+  mapPos: [0.86, 0.3],
   waystone: 'waystone',
   unlock: [{ act: 3 }],
   lockedText: 'Тропа к руинам заросла терновником.',

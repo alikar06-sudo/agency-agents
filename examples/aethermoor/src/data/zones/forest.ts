@@ -11,7 +11,7 @@ export const forest: ZoneDef = {
   ambient: ['wind', 'water'],
   floor: ',',
   fog: [20, 62],
-  mapPos: [0.78, 0.5],
+  mapPos: [0.84, 0.48],
   waystone: 'waystone',
   unlock: [{ any: [{ flag: 'forest_open' }, { act: 3 }] }],
   lockedText: 'Лес закрыт для учеников. Лесничий Бран не пропустит без разрешения.',

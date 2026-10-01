@@ -12,7 +12,7 @@ export const tunnels: ZoneDef = {
   floor: '.',
   fog: [10, 36],
   dark: true,
-  mapPos: [0.56, 0.6],
+  mapPos: [0.66, 0.62],
   unlock: [{ act: 2 }],
   lockedText: 'Тоннели закрыты для учеников.',
   map: [

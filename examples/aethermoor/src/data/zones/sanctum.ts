@@ -12,7 +12,7 @@ export const sanctum: ZoneDef = {
   floor: '.',
   fog: [14, 48],
   ambientLight: 0.9,
-  mapPos: [0.5, 0.62],
+  mapPos: [0.38, 0.7],
   unlock: [{ flag: 'sealed_door_open' }],
   lockedText: 'Печатная дверь закрыта.',
   map: [
