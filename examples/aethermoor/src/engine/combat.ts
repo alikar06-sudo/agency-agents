@@ -88,6 +88,18 @@ export class Combat {
   cooldownTotal(id: string): number { return (SPELLS[id]?.cooldown ?? 1) * derived().cdMult; }
   get inCombat(): boolean { return this.inCombatT > 0; }
 
+  // Погасить «Светоч» раньше срока.
+  dismissLight(): void {
+    const p = this.eng.player;
+    if (p.lightUntil <= this.eng.now) return;
+    p.lightUntil = 0;
+    this.lightOrb.visible = false;
+    this.eng.particles.emit({ x: this.lightOrb.position.x, y: this.lightOrb.position.y, z: this.lightOrb.position.z, count: 24, speed: 1.6, life: 0.7, color: 0xfff0b0, size: 0.35 });
+    bus.emit('sfx', { id: 'ui_close' });
+  }
+
+  lightLeft(): number { return Math.max(0, this.eng.player.lightUntil - this.eng.now); }
+
   private aimPoint(): THREE.Vector3 {
     const p = this.eng.player;
     if (this.eng.mode !== 'iso') {
@@ -132,6 +144,8 @@ export class Combat {
       return false;
     }
     if (p.dodgeT > 0 || g.player.hp <= 0) return false;
+    // повторный «Светоч» гасит огонёк
+    if (sp.kind === 'aura' && p.lightUntil > eng.now) { this.dismissLight(); return true; }
     if (g.player.level < sp.level) { if (!auto) toast('warn', `«${sp.name}» требует уровень ${sp.level}`); return false; }
     const ready = this.cds.get(id) ?? 0;
     if (eng.now < ready) { if (!auto) { toast('warn', `«${sp.name}» восстанавливается`); bus.emit('sfx', { id: 'ui_error' }); } return false; }

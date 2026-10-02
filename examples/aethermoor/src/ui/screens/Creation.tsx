@@ -33,7 +33,7 @@ export function Creation() {
   }, [origin, circle]);
   const spent = Object.values(alloc).reduce((a, b) => a + b, 0);
   const final = { int: base.int + alloc.int, power: base.power + alloc.power, defense: base.defense + alloc.defense, speed: base.speed + alloc.speed };
-  const preview: Appearance = { ...look, trim: CIRCLES[circle].trim, robe: '#1e1a22', height: gender === 'm' ? 0.97 : 0.94, build: gender === 'm' ? 1.04 : 0.94 };
+  const preview: Appearance = { ...look, trim: CIRCLES[circle].trim, robe: '#1e1a22', height: gender === 'm' ? 0.97 : 0.94, build: gender === 'm' ? 1.04 : 0.94, gender: gender === 'f' ? 'f' : 'm', age: 'young' };
 
   const canNext = step === 0 ? name.trim().length >= 2 : step === 4 ? spent === FREE : true;
   const go = (d: number) => { bus.emit('sfx', { id: 'page' }); setStep(Math.max(0, Math.min(STEP_NAMES.length - 1, step + d))); };
@@ -225,6 +225,6 @@ function Preview({ look }: { look: Appearance }) {
     rig.root.scale.setScalar(1.15);
     s.scene.add(rig.root);
     s.rig = rig;
-  }, [look.skin, look.hair, look.hairStyle, look.eyes, look.glasses, look.trim, look.height]);
+  }, [look.skin, look.hair, look.hairStyle, look.eyes, look.glasses, look.trim, look.height, look.gender]);
   return <div ref={ref} style={{ position: 'absolute', inset: 0 }} />;
 }

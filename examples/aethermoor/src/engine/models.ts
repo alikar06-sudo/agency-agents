@@ -1,7 +1,8 @@
-// Модели персонажей и существ, собранные из примитивов. Стиль — «кукольная» низкополигональность с мягким светом.
+// Модели существ из примитивов; гуманоиды — в humanoid.ts.
 import * as THREE from 'three';
 import type { Appearance } from '@/data/types';
 import { colorMat, glowMat } from './materials';
+import { buildCharacter, animateCharacter } from './humanoid';
 
 const geo = {
   sphere: new THREE.SphereGeometry(1, 18, 14),
@@ -15,20 +16,6 @@ const geo = {
   ico: new THREE.IcosahedronGeometry(1, 0),
 };
 
-function robeGeometry(flare = 1): THREE.LatheGeometry {
-  const pts: THREE.Vector2[] = [];
-  const prof: [number, number][] = [[0.0, 0], [0.42 * flare, 0.02], [0.44 * flare, 0.08], [0.36, 0.5], [0.3, 0.85], [0.26, 1.05], [0.2, 1.18], [0.0, 1.2]];
-  for (const [r, y] of prof) pts.push(new THREE.Vector2(r, y));
-  return new THREE.LatheGeometry(pts, 16);
-}
-const robeGeos = new Map<number, THREE.LatheGeometry>();
-function robeGeo(flare: number): THREE.LatheGeometry {
-  const k = Math.round(flare * 10);
-  let g = robeGeos.get(k);
-  if (!g) { g = robeGeometry(k / 10); robeGeos.set(k, g); }
-  return g;
-}
-
 function mesh(g: THREE.BufferGeometry, m: THREE.Material, sx = 1, sy = 1, sz = 1, x = 0, y = 0, z = 0): THREE.Mesh {
   const me = new THREE.Mesh(g, m);
   me.scale.set(sx, sy, sz);
@@ -37,206 +24,9 @@ function mesh(g: THREE.BufferGeometry, m: THREE.Material, sx = 1, sy = 1, sz = 1
   return me;
 }
 
-export interface CharacterRig {
-  root: THREE.Group;
-  body: THREE.Group;
-  head: THREE.Group;
-  armL: THREE.Group;
-  armR: THREE.Group;
-  robe: THREE.Mesh;
-  wand: THREE.Group;
-  wandTip: THREE.Object3D;
-  hatSlot: THREE.Group;
-  height: number;
-  setRobe(color: string, trim?: string): void;
-  setHat(kind: Appearance['hat'], color?: string): void;
-  setWandColor(color: string, glow: number): void;
-  dispose(): void;
-}
-
-export function buildCharacter(a: Appearance, opts: { material?: THREE.Material; ghost?: boolean } = {}): CharacterRig {
-  const root = new THREE.Group();
-  const body = new THREE.Group();
-  root.add(body);
-  const h = a.height ?? 1;
-  const build = a.build ?? 1;
-  const override = opts.material;
-  const skin = override ?? colorMat(a.skin, { rough: 0.7 });
-  const hairM = override ?? colorMat(a.hair, { rough: 0.85 });
-  let robeM = override ?? colorMat(a.robe, { rough: 0.92 });
-  let trimM = override ?? colorMat(a.trim, { rough: 0.6, metal: 0.2 });
-
-  const robe = mesh(robeGeo(1 + (build - 1) * 0.6), robeM, build, 1.1 * h, build, 0, 0, 0);
-  body.add(robe);
-  const hem = mesh(geo.torus, trimM, 0.43 * build, 0.43 * build, 0.25, 0, 0.06, 0);
-  hem.rotation.x = Math.PI / 2;
-  body.add(hem);
-  // плечи / воротник
-  const shoulders = mesh(geo.sphereLo, robeM, 0.34 * build, 0.16, 0.24 * build, 0, 1.2 * h, 0);
-  body.add(shoulders);
-  // галстук-шарф цветов Круга
-  const tie = mesh(geo.box, trimM, 0.07, 0.3, 0.04, 0, 1.06 * h, 0.2 * build);
-  tie.rotation.x = -0.18;
-  body.add(tie);
-  if (a.scarf) {
-    const sc = mesh(geo.torus, override ?? colorMat(a.scarf), 0.2, 0.2, 0.9, 0, 1.28 * h, 0);
-    sc.rotation.x = Math.PI / 2;
-    body.add(sc);
-  }
-
-  const head = new THREE.Group();
-  head.position.set(0, 1.42 * h, 0);
-  body.add(head);
-  const neck = mesh(geo.cylLo, skin, 0.07, 0.12, 0.07, 0, -0.12, 0);
-  head.add(neck);
-  const skull = mesh(geo.sphere, skin, 0.2, 0.23, 0.21, 0, 0.05, 0);
-  head.add(skull);
-  if (a.ears === 'pointed') {
-    for (const s of [-1, 1]) {
-      const ear = mesh(geo.coneLo, skin, 0.04, 0.16, 0.04, s * 0.2, 0.08, -0.02);
-      ear.rotation.z = -s * 1.1;
-      head.add(ear);
-    }
-  }
-  const eyeM = opts.ghost ? glowMat(0xd8f0ff) : colorMat(a.eyes, { rough: 0.3 });
-  for (const s of [-1, 1]) head.add(mesh(geo.sphereLo, eyeM, 0.028, 0.034, 0.02, s * 0.075, 0.06, 0.19));
-  // нос
-  head.add(mesh(geo.sphereLo, skin, 0.03, 0.04, 0.04, 0, 0.0, 0.205));
-  if (a.glasses) {
-    const gm = colorMat(0x2a2620, { metal: 0.8, rough: 0.3 });
-    for (const s of [-1, 1]) head.add(mesh(geo.torus, gm, 0.055, 0.055, 0.3, s * 0.075, 0.06, 0.205));
-  }
-  // волосы
-  const hs = a.hairStyle;
-  if (hs !== 'bald') {
-    head.add(mesh(geo.sphere, hairM, 0.215, 0.17, 0.22, 0, 0.13, -0.01));
-    if (hs === 'long' || hs === 'curly' || hs === 'wild') {
-      const back = mesh(geo.sphere, hairM, 0.22, hs === 'long' ? 0.36 : 0.3, 0.17, 0, -0.08, -0.08);
-      head.add(back);
-      if (hs === 'curly' || hs === 'wild') {
-        for (let i = 0; i < 7; i++) {
-          const a2 = (i / 7) * Math.PI * 2;
-          head.add(mesh(geo.sphereLo, hairM, 0.09, 0.09, 0.09, Math.cos(a2) * 0.2, 0.05 + Math.sin(i * 1.7) * 0.08, Math.sin(a2) * 0.16 - 0.04));
-        }
-      }
-    } else if (hs === 'bun') {
-      head.add(mesh(geo.sphere, hairM, 0.1, 0.1, 0.1, 0, 0.24, -0.14));
-    } else if (hs === 'tied') {
-      head.add(mesh(geo.cylLo, hairM, 0.05, 0.28, 0.05, 0, -0.08, -0.22));
-    }
-    // чёлка
-    head.add(mesh(geo.sphereLo, hairM, 0.17, 0.06, 0.1, 0, 0.2, 0.12));
-  }
-  if (a.beard && a.beard !== 'none') {
-    const bm = override ?? colorMat(a.beardColor ?? a.hair, { rough: 0.9 });
-    const len = a.beard === 'long' ? 0.42 : a.beard === 'wild' ? 0.3 : 0.12;
-    const beard = mesh(geo.coneLo, bm, 0.16, len, 0.1, 0, -0.08 - len / 2, 0.12);
-    beard.rotation.x = Math.PI;
-    head.add(beard);
-    if (a.beard === 'wild') head.add(mesh(geo.sphereLo, bm, 0.2, 0.16, 0.14, 0, -0.04, 0.08));
-  }
-  const hatSlot = new THREE.Group();
-  hatSlot.position.set(0, 0.2, 0);
-  head.add(hatSlot);
-
-  // руки
-  const mkArm = (side: number): THREE.Group => {
-    const g = new THREE.Group();
-    g.position.set(side * 0.3 * build, 1.22 * h, 0);
-    const sleeve = mesh(geo.cylLo, robeM, 0.09, 0.5, 0.09, 0, -0.25, 0);
-    g.add(sleeve);
-    const cuff = mesh(geo.cylLo, trimM, 0.1, 0.06, 0.1, 0, -0.48, 0);
-    g.add(cuff);
-    const hand = mesh(geo.sphereLo, skin, 0.065, 0.075, 0.065, 0, -0.56, 0);
-    g.add(hand);
-    body.add(g);
-    return g;
-  };
-  const armL = mkArm(-1);
-  const armR = mkArm(1);
-  armL.rotation.z = -0.12;
-  armR.rotation.z = 0.12;
-
-  const wand = new THREE.Group();
-  wand.position.set(0, -0.58, 0.04);
-  wand.rotation.x = Math.PI / 2 + 0.2;
-  const wandM = colorMat(0x6a4a2a, { rough: 0.6 });
-  const shaft = mesh(geo.cylLo, wandM, 0.018, 0.42, 0.018, 0, 0.18, 0);
-  wand.add(shaft);
-  const tipM = new THREE.MeshBasicMaterial({ color: 0xfff0c0 });
-  const tip = mesh(geo.sphereLo, tipM, 0.03, 0.03, 0.03, 0, 0.4, 0);
-  tip.castShadow = false;
-  wand.add(tip);
-  const wandTip = new THREE.Object3D();
-  wandTip.position.set(0, 0.42, 0);
-  wand.add(wandTip);
-  armR.add(wand);
-  wand.visible = false;
-
-  const rig: CharacterRig = {
-    root, body, head, armL, armR, robe, wand, wandTip, hatSlot, height: 1.7 * h,
-    setRobe(color: string, trim?: string) {
-      if (override) return;
-      robeM = colorMat(color, { rough: 0.92 });
-      robe.material = robeM;
-      shoulders.material = robeM;
-      (armL.children[0] as THREE.Mesh).material = robeM;
-      (armR.children[0] as THREE.Mesh).material = robeM;
-      if (trim) {
-        trimM = colorMat(trim, { rough: 0.6, metal: 0.2 });
-        hem.material = trimM; tie.material = trimM;
-        (armL.children[1] as THREE.Mesh).material = trimM;
-        (armR.children[1] as THREE.Mesh).material = trimM;
-      }
-    },
-    setHat(kind, color = '#2a2430') {
-      hatSlot.clear();
-      if (!kind || kind === 'none') return;
-      const m = override ?? colorMat(color, { rough: 0.85 });
-      if (kind === 'pointed' || kind === 'tall') {
-        const tall = kind === 'tall' ? 0.75 : 0.5;
-        hatSlot.add(mesh(geo.cyl, m, 0.32, 0.03, 0.32, 0, -0.02, 0));
-        const c = mesh(geo.cone, m, 0.2, tall, 0.2, 0, tall / 2 - 0.02, 0);
-        c.rotation.z = 0.12;
-        hatSlot.add(c);
-      } else if (kind === 'cap') {
-        hatSlot.add(mesh(geo.sphere, m, 0.23, 0.12, 0.23, 0, -0.02, 0));
-      } else if (kind === 'hood') {
-        const hood = mesh(geo.sphere, m, 0.27, 0.3, 0.27, 0, -0.1, -0.04);
-        hatSlot.add(hood);
-      } else if (kind === 'crown') {
-        const cm = override ?? colorMat(0xd8b050, { metal: 0.8, rough: 0.3 });
-        for (let i = 0; i < 7; i++) {
-          const ang = (i / 7) * Math.PI * 2;
-          const sp = mesh(geo.coneLo, cm, 0.04, 0.22, 0.04, Math.cos(ang) * 0.19, 0.06, Math.sin(ang) * 0.19);
-          hatSlot.add(sp);
-        }
-      }
-    },
-    setWandColor(color: string, glow: number) {
-      shaft.material = colorMat(color, { rough: 0.5 });
-      tipM.color.setHex(glow);
-    },
-    dispose() { root.removeFromParent(); },
-  };
-  rig.setHat(a.hat ?? 'none');
-  return rig;
-}
-
-// Анимация гуманоида: шаг, дыхание, каст, кувырок.
-export function animateCharacter(rig: CharacterRig, t: number, moving: number, cast: number, dodge: number, dt: number): void {
-  const swing = Math.sin(t * 9) * 0.55 * moving;
-  const bob = Math.abs(Math.sin(t * 9)) * 0.05 * moving + Math.sin(t * 2) * 0.008;
-  rig.body.position.y = bob;
-  rig.robe.rotation.y = Math.sin(t * 9) * 0.06 * moving;
-  rig.robe.scale.x = rig.robe.scale.z = (rig.robe.userData.base ?? (rig.robe.userData.base = rig.robe.scale.x)) * (1 + Math.sin(t * 9) * 0.03 * moving);
-  rig.armL.rotation.x = swing;
-  const castTarget = -1.35 * cast;
-  rig.armR.rotation.x += ((cast > 0 ? castTarget : -swing) - rig.armR.rotation.x) * Math.min(1, dt * 18);
-  rig.head.rotation.y = Math.sin(t * 0.7) * 0.1 * (1 - moving);
-  rig.body.rotation.x = dodge > 0 ? Math.sin(dodge * Math.PI) * -0.9 : 0;
-  rig.body.position.y -= dodge > 0 ? Math.sin(dodge * Math.PI) * 0.45 : 0;
-}
+// Гуманоиды собираются в humanoid.ts (реалистичные пропорции, лицо, скелет).
+export { buildCharacter, animateCharacter };
+export type { CharacterRig, AnimExtra } from './humanoid';
 
 // ---------------- Существа ----------------
 
@@ -503,6 +293,7 @@ export function buildCreature(model: string, color: number, color2 = 0xff4030, s
       const rig = buildCharacter({
         skin: model === 'cultist' ? '#c8a890' : '#d8b8a0', hair: '#1a1410', hairStyle: 'short', eyes: '#ff6a3a',
         robe: '#' + color.toString(16).padStart(6, '0'), trim: '#' + color2.toString(16).padStart(6, '0'), hat: 'hood',
+        gender: 'm', age: 'adult', beard: model === 'cultist' ? 'short' : 'none', beardColor: '#2a2018',
       });
       rig.setHat('hood', '#' + color.toString(16).padStart(6, '0'));
       rig.wand.visible = true;

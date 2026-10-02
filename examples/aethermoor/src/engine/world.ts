@@ -250,6 +250,27 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
     return 0;
   }
 
+  // Точки появления без заданного поворота смотрят туда, где больше всего свободного места
+  // (в виде от первого лица герой не должен появляться лицом к стене или краю карты).
+  for (const m of markers) {
+    if (m.def.kind !== 'spawn' || m.def.facing !== undefined) continue;
+    let best = -1;
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      const dc = Math.sin(a), dr = Math.cos(a);
+      let open = 0;
+      for (let step = 1; step <= 14; step++) {
+        const cc = Math.round(m.col + dc * step), rr = Math.round(m.row + dr * step);
+        if (cc < 0 || rr < 0 || cc >= w || rr >= h || grid.walk[rr * w + cc]) break;
+        open++;
+      }
+      // при равенстве — к центру зоны
+      const toCenter = Math.cos(a - Math.atan2(w / 2 - m.col, h / 2 - m.row));
+      const score = open + toCenter * 0.5;
+      if (score > best) { best = score; m.facing = a; }
+    }
+  }
+
   // ---------- полы ----------
   const dummy = new THREE.Object3D();
   const col = new THREE.Color();

@@ -17,6 +17,18 @@ import { absMinutes } from '@/state/gameState';
 import { portrait } from '../portraits';
 import type { CircleId } from '@/data/types';
 
+// «Светоч»: сколько секунд ещё горит огонёк; щелчок гасит его.
+function LightChip() {
+  const [left, setLeft] = useState(0);
+  useEffect(() => { const t = setInterval(() => setLeft(Math.ceil(engine.combat?.lightLeft() ?? 0)), 250); return () => clearInterval(t); }, []);
+  if (left <= 0) return null;
+  return (
+    <span className="buff light" title="Щёлкните или произнесите «Светоч» ещё раз, чтобы погасить" onClick={() => engine.combat.dismissLight()} style={{ cursor: 'pointer', pointerEvents: 'auto' }}>
+      Светоч · {left} с ✕
+    </span>
+  );
+}
+
 function Vitals() {
   const p = useGame((s) => s.g!.player);
   const buffs = useGame((s) => s.g!.buffs);
@@ -40,6 +52,7 @@ function Vitals() {
         <div className="bar xp" title={`Опыт: ${p.xp} / ${xpToNext(p.level)}`}><div className="fill" style={{ transform: `scaleX(${xpPct})` }} /></div>
         <div className="buffs">
           {buffs.filter((b) => b.until > now).map((b) => <span key={b.id} className="buff">{b.label} · {Math.ceil((b.until - now) / 60)}ч</span>)}
+          <LightChip />
           {p.corruption >= 20 && <span className="buff bad">Порча {p.corruption}</span>}
         </div>
       </div>

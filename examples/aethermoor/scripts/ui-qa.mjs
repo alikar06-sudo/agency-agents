@@ -137,6 +137,20 @@ try {
   check(await G(() => Object.keys(JSON.parse(localStorage.getItem('aethermoor.settings.v1')).keys).length === 0), 'сброс раскладки');
   await G(() => window.__aether.setUI({ menu: null }));
 
+  console.log('— Утро в спальнях');
+  await G(() => window.__aether.goto('towers')); await wait(page, 1500);
+  await G(() => window.__aether.setHour(4)); await wait(page, 1500);
+  const asleep = await G(() => window.__aether.engine.npcs.list.filter((n) => !n.removed && n.sleeping).length);
+  check(asleep > 0, `ночью ученики спят в кроватях (${asleep})`);
+  await G(() => window.__aether.setHour(7)); await wait(page, 2500);
+  // проснувшиеся уходят по делам стоя, а не «плывут» лёжа
+  const lying = await G(() => window.__aether.engine.npcs.list.filter((n) => !n.removed && !n.sleeping && Math.abs(n.rig.root.rotation.x) > 0.1).map((n) => n.def.id));
+  const walking = await G(() => window.__aether.engine.npcs.list.filter((n) => !n.removed && n.path.length > 0).length);
+  check(lying.length === 0 && walking > 0, `проснувшиеся идут стоя (идут: ${walking}, лёжа: ${lying.join(', ') || 'никто'})`);
+  const dup = await G(() => { const ids = window.__aether.engine.npcs.list.filter((n) => !n.removed).map((n) => n.def.id); return ids.filter((id, i) => ids.indexOf(id) !== i); });
+  check(dup.length === 0, `NPC не раздваиваются при смене расписания (${dup.join(', ') || 'ок'})`);
+  if (lying.length) console.log('   состояние:', JSON.stringify(await G(() => { const u = window.__aether.ui(); return { screen: u.screen, menu: u.menu, pause: u.pauseMenu, dialogue: !!u.dialogue, read: !!u.read, cinematic: !!u.cinematic, wait: u.waitMenu }; })));
+
   console.log('— Мобильный экран');
   await page.setViewportSize({ width: 390, height: 844 });
   await wait(page, 1200);

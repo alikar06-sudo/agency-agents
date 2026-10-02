@@ -734,8 +734,8 @@ export class Engine {
         this.pitch -= input.mouse.dy * 0.0022 * sens * (st.invertY ? -1 : 1);
       } else if (input.lockFailed && input.mouse.inside) {
         // без захвата мыши: камера поворачивается, когда курсор у края экрана
-        const ex = Math.abs(input.mouse.nx) > 0.6 ? (Math.abs(input.mouse.nx) - 0.6) / 0.4 : 0;
-        const ey = Math.abs(input.mouse.ny) > 0.65 ? (Math.abs(input.mouse.ny) - 0.65) / 0.35 : 0;
+        const ex = Math.abs(input.mouse.nx) > 0.72 ? (Math.abs(input.mouse.nx) - 0.72) / 0.28 : 0;
+        const ey = Math.abs(input.mouse.ny) > 0.75 ? (Math.abs(input.mouse.ny) - 0.75) / 0.25 : 0;
         this.yaw -= Math.sign(input.mouse.nx) * ex * 2.6 * sens * dt;
         this.pitch += Math.sign(input.mouse.ny) * ey * 1.6 * sens * dt * (st.invertY ? -1 : 1);
       }

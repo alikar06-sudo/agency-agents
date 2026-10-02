@@ -20,7 +20,7 @@ export function exposeDebug(): void {
     winMinigame: (score = 1) => { const r = ui().minigame; if (r) finishMinigame(r, score); },
     goto: (zone: ZoneId, spawn = 'start') => engine.enterZone(zone, spawn),
     tp: (x: number, z: number) => { engine.player.x = x; engine.player.z = z; engine.snapCamera(); },
-    near: (npc: string) => { const n = engine.npcs.find(npc); if (n) { engine.player.x = n.x + 1.2; engine.player.z = n.z + 0.6; return true; } return false; },
+    near: (npc: string) => { const n = engine.npcs.find(npc); if (n) { engine.player.x = n.x + 1.2; engine.player.z = n.z + 0.6; engine.yaw = Math.atan2(n.x - engine.player.x, n.z - engine.player.z); engine.player.facing = engine.yaw; return true; } return false; },
     // Встать рядом с маркером зоны (по ключу или id).
     toMarker: (key: string) => {
       const m = engine.zone?.markers.find((mk) => mk.key === key || mk.def.id === key);

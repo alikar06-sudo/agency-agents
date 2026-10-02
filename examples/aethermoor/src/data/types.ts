@@ -31,6 +31,8 @@ export interface Appearance {
   build?: number;
   scarf?: string;
   ears?: 'normal' | 'pointed';
+  gender?: 'm' | 'f';
+  age?: 'child' | 'young' | 'adult' | 'old';
 }
 
 // ---------- Условия и эффекты (общий язык для диалогов, квестов, событий) ----------

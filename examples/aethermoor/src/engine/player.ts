@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import type { Engine } from './Engine';
 import { buildCharacter, animateCharacter } from './models';
+import { voice } from '@/core/voice';
 import type { CharacterRig } from './models';
 import { input } from '@/core/input';
 import { bus } from '@/core/bus';
@@ -61,7 +62,7 @@ export class PlayerEntity {
     const robeItem = g.equipment.robe ? g.inventory.find((i) => i.uid === g.equipment.robe) : null;
     const hatItem = g.equipment.hat ? g.inventory.find((i) => i.uid === g.equipment.hat) : null;
     const wandItem = g.equipment.wand ? g.inventory.find((i) => i.uid === g.equipment.wand) : null;
-    const look: Appearance = { ...a, robe: robeItem ? ITEMS[robeItem.id]?.color ?? '#1e1a22' : '#1e1a22', trim: circle.trim, scarf: undefined };
+    const look: Appearance = { ...a, robe: robeItem ? ITEMS[robeItem.id]?.color ?? '#1e1a22' : '#1e1a22', trim: circle.trim, scarf: undefined, gender: g.player.gender === 'f' ? 'f' : 'm', age: 'young' };
     const old = this.rig;
     const rig = buildCharacter(look);
     rig.root.position.copy(old.root.position);
@@ -258,7 +259,7 @@ export class PlayerEntity {
 
     this.castAnim = Math.max(0, this.castAnim - dt * 3);
     const dodgePhase = this.dodgeT > 0 ? 1 - this.dodgeT / 0.32 : 0;
-    animateCharacter(this.rig, this.t, this.moving, this.shielding ? 0.8 : this.castAnim, dodgePhase, dt);
+    animateCharacter(this.rig, this.t, this.moving, this.shielding ? 0.8 : this.castAnim, dodgePhase, dt, { mouth: voice.mouth('player', this.t), lookYaw: 0, lookPitch: this.eng.mode === 'third' ? -this.eng.pitch * 0.4 : 0 });
     this.rig.root.position.set(this.x, 0, this.z);
     this.rig.root.rotation.y = this.facing;
     const hurt = (this.rig.root.userData.hurt ?? 0) as number;

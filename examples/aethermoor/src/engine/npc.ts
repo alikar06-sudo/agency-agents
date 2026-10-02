@@ -29,12 +29,14 @@ export class NpcEntity {
   dist = 99;
   t = Math.random() * 10;
   moving = 0;
+  talkK = 0;
   mark: '' | '!' | '?' = '';
   markT = 0;
   readonly radius = 0.4;
 
   constructor(private eng: Engine, public def: NpcDef, public loc: NpcLocation, x: number, z: number) {
-    this.rig = buildCharacter(def.appearance);
+    const vp = VOICE_PROFILES[def.id];
+    this.rig = buildCharacter({ ...def.appearance, gender: def.appearance.gender ?? vp?.gender, age: def.appearance.age ?? vp?.age });
     this.rig.wand.visible = !!def.circle || def.title.includes('Магистр') || def.title.includes('Профессор');
     this.x = x; this.z = z;
     this.home = { x, z };
@@ -42,7 +44,10 @@ export class NpcEntity {
     eng.scene.add(this.rig.root);
   }
 
-  get sleeping(): boolean { return this.loc.activity === 'sleep'; }
+  // Спит только тот, кто уже лёг на своё место: по дороге к кровати и после пробуждения NPC идёт стоя.
+  get sleeping(): boolean {
+    return this.loc.activity === 'sleep' && !this.leaving && this.path.length === 0 && Math.hypot(this.x - this.home.x, this.z - this.home.z) < 0.8;
+  }
 
   talk(): void {
     if (this.sleeping) { toast('info', `${this.def.name.split(' ')[0]} спит`, 'Будить не стоит.'); return; }
@@ -111,7 +116,23 @@ export class NpcEntity {
       this.rig.root.rotation.set(-Math.PI / 2, 0, 0);
       return;
     }
-    animateCharacter(this.rig, this.t, this.moving * 0.6, 0, 0, dt);
+    // смотрит на героя, когда тот рядом; во время речи шевелит губами и жестикулирует
+    const p = this.eng.player;
+    let lookYaw: number | undefined;
+    let lookPitch: number | undefined;
+    if (this.dist < 5 && this.moving < 0.3) {
+      let d = Math.atan2(p.x - this.x, p.z - this.z) - this.facing;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      if (Math.abs(d) < 1.9) {
+        lookYaw = d;
+        const eyeDiff = (this.eng.mode === 'first' ? p.rig.height * 0.93 : p.rig.height * 0.9) - this.rig.height * 0.92;
+        lookPitch = -Math.atan2(eyeDiff, Math.max(0.6, this.dist)) * 0.8;
+      }
+    }
+    const mouth = voice.mouth(this.def.id, this.t);
+    this.talkK += ((mouth > 0 ? 1 : 0) - this.talkK) * Math.min(1, dt * 3);
+    animateCharacter(this.rig, this.t, this.moving * 0.6, 0, 0, dt, { mouth, lookYaw, lookPitch, talk: this.talkK });
     this.rig.root.position.set(this.x, 0, this.z);
     this.rig.root.rotation.set(0, this.facing, 0);
   }
@@ -170,7 +191,9 @@ export class NpcManager {
         const exit = zone.markers.find((m) => m.def.kind === 'exit' && next && m.def.to === next.zone)
           ?? zone.markers.filter((m) => m.def.kind === 'exit').sort((a, b) => Math.hypot(a.x - n.x, a.z - n.z) - Math.hypot(b.x - n.x, b.z - n.z))[0];
         if (exit) { n.leaving = true; n.goTo(exit.x, exit.z); if (!n.path.length) n.removed = true; } else n.removed = true;
-      } else if (loc.at !== n.loc.at || loc.activity !== n.loc.activity) {
+      } else if (n.leaving || loc.at !== n.loc.at || loc.activity !== n.loc.activity) {
+        // расписание снова привело NPC сюда, пока он шёл к выходу — разворачивается, а не раздваивается
+        n.leaving = false;
         n.loc = loc;
         const pos = this.anchorPos(loc.at);
         if (pos) { n.home = pos; n.goTo(pos.x, pos.z); }

@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import type { Appearance } from '@/data/types';
 import { buildCharacter } from '@/engine/models';
+import { VOICE_PROFILES } from '@/data/voices';
+import { G, hasGame } from '@/state/store';
 
 const cache = new Map<string, string>();
 let renderer: THREE.WebGLRenderer | null = null;
@@ -29,13 +31,22 @@ export function portrait(key: string, a: Appearance): string {
   if (cached) return cached;
   try {
     if (!renderer) setup();
-    const rig = buildCharacter(a);
+    // пол и возраст: у NPC — из профиля голоса, у героя — из выбранного обращения
+    const look: Appearance = { ...a };
+    if (!look.gender && key.startsWith('npc_')) { const v = VOICE_PROFILES[key.slice(4)]; if (v) { look.gender = v.gender; look.age = v.age; } }
+    if (!look.gender && key.startsWith('player_') && hasGame()) { look.gender = G().player.gender === 'f' ? 'f' : 'm'; look.age = 'young'; }
+    const rig = buildCharacter(look);
     rig.wand.visible = false;
+    rig.root.rotation.y = 0.22;
     scene.add(rig.root);
-    const headY = 1.42 * (a.height ?? 1) + 0.08;
-    camera.position.set(0.32, headY + 0.08, 1.45);
-    camera.lookAt(0, headY, 0);
-    rig.root.rotation.y = 0.18;
+    rig.root.updateMatrixWorld(true);
+    const chin = new THREE.Vector3(), crown = new THREE.Vector3();
+    rig.head.getWorldPosition(chin);
+    rig.hatSlot.getWorldPosition(crown);
+    const headH = crown.y - chin.y;
+    const cy = chin.y + headH * 0.45;
+    camera.position.set(headH * 1.1, cy + headH * 0.12, headH * 5.6);
+    camera.lookAt(0, cy - headH * 0.05, 0);
     renderer!.render(scene, camera);
     const url = renderer!.domElement.toDataURL('image/png');
     scene.remove(rig.root);

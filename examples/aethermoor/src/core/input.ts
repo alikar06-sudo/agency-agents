@@ -195,8 +195,11 @@ class Input {
     this.listeners.push(() => document.removeEventListener('pointerlockchange', onLock), () => document.removeEventListener('pointerlockerror', onLockError));
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    // курсор ушёл с холста (на кнопку интерфейса или за окно) — края экрана больше не поворачивают камеру
+    const onLeave = (e: PointerEvent) => { if (e.pointerType !== 'touch') this.mouse.inside = false; };
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointerleave', onLeave);
     window.addEventListener('pointerup', onUp);
     canvas.addEventListener('wheel', onWheel, { passive: true });
     canvas.addEventListener('contextmenu', onCtx);
@@ -206,6 +209,7 @@ class Input {
       () => window.removeEventListener('keyup', onKeyUp),
       () => canvas.removeEventListener('pointermove', onMove),
       () => canvas.removeEventListener('pointerdown', onDown),
+      () => canvas.removeEventListener('pointerleave', onLeave),
       () => window.removeEventListener('pointerup', onUp),
       () => canvas.removeEventListener('wheel', onWheel),
       () => canvas.removeEventListener('contextmenu', onCtx),

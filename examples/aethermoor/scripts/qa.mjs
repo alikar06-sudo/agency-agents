@@ -150,7 +150,8 @@ try {
   log('— Акт III');
   await goto(page, 'forest', 'from_gates');
   await toMarker('seal_glade');
-  await wait(page, 1500);
+  // сцена начинается, когда движок заметит героя у печати; на программном рендере кадры редкие
+  await page.waitForFunction(() => !!window.__aether.ui().dialogue, null, { timeout: 15000 }).catch(() => {});
   await runDialogue(page);
   await wait(page, 700);
   check(await flag('soren_forest_seen'), 'встреча с Сореном у печати Корня');
