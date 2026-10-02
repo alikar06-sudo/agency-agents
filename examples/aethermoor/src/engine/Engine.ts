@@ -88,6 +88,7 @@ export class Engine {
   // обзор: yaw — направление взгляда (вперёд = (sin yaw, cos yaw)), pitch — наклон вверх/вниз
   mode: CamMode = 'iso';
   yaw = 0;
+  private edgeArmed = false;
   pitch = -0.08;
   view!: ViewModel;
   private ownUnlock = false;
@@ -136,8 +137,10 @@ export class Engine {
     this.view = new ViewModel();
     this.camera.add(this.view.group);
     input.wantLock = () => this.mode !== 'iso' && !this.title && hasGame() && !isModalOpen() && !this.loading;
-    input.onLockChange = (locked) => {
+    input.onLockChange = (locked, failed) => {
       setUI({ lookLocked: locked });
+      // браузер отказал в захвате — остаёмся в игре, обзор идёт за свободным курсором
+      if (failed) { this.ownUnlock = false; return; }
       // Esc снимает захват мыши — открываем паузу, как в большинстве игр
       if (!locked && !this.ownUnlock && this.mode !== 'iso' && hasGame() && ui().screen === 'game' && !isModalOpen()) setUI({ pauseMenu: true });
       this.ownUnlock = false;
@@ -150,7 +153,7 @@ export class Engine {
       const order: CamMode[] = ['first', 'third', 'iso'];
       const next = order[(order.indexOf(useSettings.getState().camera) + 1) % order.length];
       setSettings({ camera: next });
-      toast('info', MODE_NAMES[next], next === 'iso' ? 'Мышь — прицел, колесо — масштаб.' : 'Щёлкните, чтобы управлять взглядом мышью. V — сменить вид.');
+      toast('info', MODE_NAMES[next], next === 'iso' ? 'Мышь — прицел, колесо — масштаб.' : 'Водите мышью или тачпадом, чтобы осматриваться. V — сменить вид.');
     });
     this.applyQuality();
     this.resize();
@@ -728,16 +731,21 @@ export class Engine {
     const st = useSettings.getState();
     const modal = isModalOpen();
     const sens = st.sensitivity;
+    // поворот у края экрана включается только после того, как игрок сам повёл мышью в игре,
+    // а не потому, что курсор остался у края после щелчка по кнопке меню
+    if (modal || this.loading) this.edgeArmed = false;
+    else if (input.mouse.fx || input.mouse.fy) this.edgeArmed = true;
     if (!modal) {
       if (input.locked) {
         this.yaw -= input.mouse.dx * 0.0022 * sens;
         this.pitch -= input.mouse.dy * 0.0022 * sens * (st.invertY ? -1 : 1);
-      } else if (input.lockFailed && input.mouse.inside) {
-        // без захвата мыши: камера поворачивается, когда курсор у края экрана
-        const ex = Math.abs(input.mouse.nx) > 0.72 ? (Math.abs(input.mouse.nx) - 0.72) / 0.28 : 0;
-        const ey = Math.abs(input.mouse.ny) > 0.75 ? (Math.abs(input.mouse.ny) - 0.75) / 0.25 : 0;
-        this.yaw -= Math.sign(input.mouse.nx) * ex * 2.6 * sens * dt;
-        this.pitch += Math.sign(input.mouse.ny) * ey * 1.6 * sens * dt * (st.invertY ? -1 : 1);
+      } else if (input.mouse.inside && !input.touch.active) {
+        // без захвата мыши (тачпад, встроенная страница): камера следует за движением курсора,
+        // а у левого и правого края экрана продолжает поворачиваться
+        this.yaw -= input.mouse.fx * 0.0034 * sens;
+        this.pitch -= input.mouse.fy * 0.0018 * sens * (st.invertY ? -1 : 1);
+        const ex = this.edgeArmed && Math.abs(input.mouse.nx) > 0.8 ? (Math.abs(input.mouse.nx) - 0.8) / 0.2 : 0;
+        this.yaw -= Math.sign(input.mouse.nx) * ex * 2.2 * sens * dt;
       }
       this.yaw += ((input.isCode('ArrowLeft') ? 1 : 0) - (input.isCode('ArrowRight') ? 1 : 0)) * 2.4 * dt;
       this.yaw -= input.touch.lookX * 0.006 * sens;
@@ -795,7 +803,7 @@ export class Engine {
       p.rig.root.visible = free > 0.9;
     }
     // прицел: точка впереди по направлению взгляда; без захвата мыши — под курсором
-    if (input.lockFailed && input.mouse.inside && !input.touch.active) {
+    if (!input.locked && input.mouse.inside && !input.touch.active) {
       this.stepRaycaster.setFromCamera(new THREE.Vector2(input.mouse.nx, input.mouse.ny), this.camera);
       const hit = new THREE.Vector3();
       if (this.stepRaycaster.ray.intersectPlane(this.groundPlane, hit) && Math.hypot(hit.x - p.x, hit.z - p.z) < 40) { this.aim.copy(hit); return; }

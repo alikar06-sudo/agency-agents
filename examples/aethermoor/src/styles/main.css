@@ -154,6 +154,11 @@ input { font-family: inherit; }
 /* ---------- HUD ---------- */
 .hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; font-size: 15px; }
 .hud > * { pointer-events: auto; }
+/* прозрачные слои поверх сцены не должны перехватывать мышь — иначе не работают обзор, прицел и щелчки */
+.hud > .hurt-vignette, .hud > .crosshair, .hud > .look-hint { pointer-events: none; }
+.hud > .hud-tr, .hud > .hud-bottom { pointer-events: none; }
+.hud-tr > *, .hud-bottom > * { pointer-events: auto; }
+.hud-tr > .zone-name { pointer-events: none; }
 .hud-tl { position: absolute; top: 14px; left: 14px; display: flex; gap: 12px; align-items: flex-start; }
 .portrait { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--gold-dim); background: radial-gradient(circle at 40% 35%, #3a2e48, #120e18); display: flex; align-items: center; justify-content: center; font-family: var(--font-head); font-size: 28px; color: var(--gold-2); box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.35), var(--shadow); position: relative; overflow: hidden; }
 .portrait img { width: 100%; height: 100%; object-fit: cover; }

@@ -233,16 +233,18 @@ function LookOverlay() {
   const locked = useUI((s) => s.lookLocked);
   const modal = useUI((s) => isModalOpen(s));
   const prompt = useUI((s) => s.prompt);
+  // подсказка видна первые 20 секунд после входа в режим обзора
+  const [hint, setHint] = useState(true);
+  useEffect(() => { setHint(true); const t = setTimeout(() => setHint(false), 20000); return () => clearTimeout(t); }, [mode]);
   if (mode === 'iso' || modal) return null;
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   return (
     <>
       <div className={'crosshair' + (prompt ? ' on' : '')} />
-      {!locked && !input.lockFailed && !coarse && (
-        <div className="look-hint">Щёлкните по экрану, чтобы осматриваться мышью · <span className="kbd">{boundKey('view')}</span> сменить вид</div>
-      )}
-      {!locked && input.lockFailed && !coarse && (
-        <div className="look-hint">Подведите курсор к краю экрана, чтобы повернуться, или используйте ← →</div>
+      {!locked && !coarse && hint && (
+        <div className="look-hint">
+          Водите мышью или тачпадом, чтобы осматриваться · у края экрана — поворот · ← → · <span className="kbd">{boundKey('view')}</span> вид
+        </div>
       )}
     </>
   );

@@ -104,7 +104,7 @@ class Input {
   private down = new Set<Action>();
   private pressed = new Set<Action>();
   private codes = new Set<string>();
-  mouse = { x: 0, y: 0, nx: 0, ny: 0, left: false, right: false, leftPressed: false, rightPressed: false, inside: false, dx: 0, dy: 0 };
+  mouse = { x: 0, y: 0, nx: 0, ny: 0, left: false, right: false, leftPressed: false, rightPressed: false, inside: false, dx: 0, dy: 0, fx: 0, fy: 0 };
   wheel = 0;
   touch = { moveX: 0, moveY: 0, aim: false, aimX: 0, aimY: 0, active: false, lookX: 0, lookY: 0 };
   private listeners: (() => void)[] = [];
@@ -114,10 +114,12 @@ class Input {
   // а щелчок по холсту захватывает указатель мыши для обзора.
   arrowTurn = false;
   wantLock: () => boolean = () => false;
-  onLockChange: (locked: boolean) => void = () => {};
+  onLockChange: (locked: boolean, failed?: boolean) => void = () => {};
   lockFailed = false;
   private canvas: HTMLElement | null = null;
   private touchLookId: number | null = null;
+  // движение свободного курсора (без захвата): прирост между событиями над холстом
+  private lastFree: { x: number; y: number } | null = null;
   private touchLast = { x: 0, y: 0 };
 
   get locked(): boolean { return !!this.canvas && document.pointerLockElement === this.canvas; }
@@ -126,8 +128,10 @@ class Input {
     if (!this.canvas || this.locked || this.lockFailed) return;
     try {
       const r = (this.canvas as HTMLElement & { requestPointerLock(o?: unknown): Promise<void> | void }).requestPointerLock();
-      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => { this.lockFailed = true; this.onLockChange(false); });
-    } catch { this.lockFailed = true; }
+      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => { this.lockFailed = true; this.onLockChange(false, true); });
+    } catch { this.lockFailed = true; this.onLockChange(false, true); }
+    // встроенные страницы и некоторые браузеры молча игнорируют запрос — не ждём вечно
+    setTimeout(() => { if (!this.locked && !this.lockFailed) { this.lockFailed = true; this.onLockChange(false, true); } }, 1000);
   }
 
   exitLock(): void { if (this.locked) document.exitPointerLock(); }
@@ -162,6 +166,8 @@ class Input {
         return;
       }
       if (this.locked) { this.mouse.dx += e.movementX; this.mouse.dy += e.movementY; this.mouse.inside = true; return; }
+      if (this.lastFree) { this.mouse.fx += e.clientX - this.lastFree.x; this.mouse.fy += e.clientY - this.lastFree.y; }
+      this.lastFree = { x: e.clientX, y: e.clientY };
       const r = canvas.getBoundingClientRect();
       this.mouse.x = e.clientX - r.left;
       this.mouse.y = e.clientY - r.top;
@@ -189,14 +195,14 @@ class Input {
     const onCtx = (e: Event) => e.preventDefault();
     const onBlur = () => { this.down.clear(); this.codes.clear(); this.mouse.left = false; this.mouse.right = false; };
     const onLock = () => { if (!this.locked) { this.mouse.left = false; this.mouse.right = false; } this.onLockChange(this.locked); };
-    const onLockError = () => { this.lockFailed = true; this.onLockChange(false); };
+    const onLockError = () => { this.lockFailed = true; this.onLockChange(false, true); };
     document.addEventListener('pointerlockchange', onLock);
     document.addEventListener('pointerlockerror', onLockError);
     this.listeners.push(() => document.removeEventListener('pointerlockchange', onLock), () => document.removeEventListener('pointerlockerror', onLockError));
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     // курсор ушёл с холста (на кнопку интерфейса или за окно) — края экрана больше не поворачивают камеру
-    const onLeave = (e: PointerEvent) => { if (e.pointerType !== 'touch') this.mouse.inside = false; };
+    const onLeave = (e: PointerEvent) => { if (e.pointerType !== 'touch') { this.mouse.inside = false; this.lastFree = null; } };
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointerleave', onLeave);
@@ -236,6 +242,7 @@ class Input {
     this.mouse.leftPressed = false;
     this.mouse.rightPressed = false;
     this.mouse.dx = 0; this.mouse.dy = 0;
+    this.mouse.fx = 0; this.mouse.fy = 0;
     this.touch.lookX = 0; this.touch.lookY = 0;
     this.wheel = 0;
   }

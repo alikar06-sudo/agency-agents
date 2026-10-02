@@ -11,12 +11,14 @@ import { continueGame, newGame } from './game';
 import { finishMinigame } from '@/ui/minigames/MinigameHost';
 import type { ZoneId } from '@/data/types';
 import { npcLocation } from '@/systems/schedule';
+import { input } from '@/core/input';
 
 export function exposeDebug(): void {
   (window as unknown as Record<string, unknown>).__aether = {
     engine, G, ui, setUI, mutate, apply, talkTo, choose, advance, currentNode, choicesFor, endDialogue,
     startQuest, completeObjective, activeObjectives, advanceTime, addItem, saveGame, listSaves, continueGame, newGame,
     useUI,
+    inputLockFailed: () => input.lockFailed,
     winMinigame: (score = 1) => { const r = ui().minigame; if (r) finishMinigame(r, score); },
     goto: (zone: ZoneId, spawn = 'start') => engine.enterZone(zone, spawn),
     tp: (x: number, z: number) => { engine.player.x = x; engine.player.z = z; engine.snapCamera(); },
