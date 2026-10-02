@@ -203,10 +203,17 @@ try {
 
   await hour(22);
   await goto(page, 'gates', 'from_hall');
-  await wait(page, 2500);
+  // волна приходит через пару секунд после входа; на программном рендере кадры редкие — ждём её саму
+  await page.waitForFunction(() => window.__aether.enemies().filter((e) => e.type === 'cultist').length >= 3, null, { timeout: 20000 }).catch(() => {});
+  await wait(page, 300);
   check(await state(() => window.__aether.enemies().filter((e) => e.type === 'cultist').length) === 3, 'Ночь Пепла: первая волна');
   await snap('06_night_of_ash');
-  for (let i = 0; i < 4 && !(await objDone('mq_night_of_ash', 'defend')); i++) { await killAll('cultist'); await wait(page, 3600); }
+  for (let i = 0; i < 4 && !(await objDone('mq_night_of_ash', 'defend')); i++) {
+    await killAll('cultist');
+    // следующая волна или выполненная цель
+    await page.waitForFunction(() => window.__aether.enemies().some((e) => e.type === 'cultist') || window.__aether.G().quests.mq_night_of_ash.done.includes('defend'), null, { timeout: 20000 }).catch(() => {});
+    await wait(page, 300);
+  }
   check(await objDone('mq_night_of_ash', 'defend'), 'нападение отбито');
   await meet(page, 'cassian', [0, 'дуэли']);
   await wait(page, 300);
@@ -215,7 +222,7 @@ try {
   await runDialogue(page);
   check(await flag('cassian_redeemed'), 'Кассиан остался на нашей стороне');
   await state(() => window.__aether.sleep());
-  await wait(page, 2200);
+  await page.waitForFunction(() => !!window.__aether.ui().dialogue, null, { timeout: 20000 }).catch(() => {});
   await runDialogue(page, ['Нет']);
   check(await flag('voice_answered') && await flag('mira_taken'), 'голос из-под камня; Миру похитили');
   await goto(page, 'hall', 'from_towers');

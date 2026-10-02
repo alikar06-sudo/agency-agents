@@ -203,7 +203,9 @@ function spawnAround(type: string, n: number, r: number): void {
 let raidBusy = false;
 function nightRaid(): void {
   const g = G();
-  if (raidBusy || engine.zone?.def.id !== 'gates' || engine.loading) return;
+  if (engine.zone?.def.id !== 'gates' || engine.loading) return;
+  // волну только что вызвали — не дублируем, но и не теряем: если её уже перебили, следующая придёт чуть позже
+  if (raidBusy) { setTimeout(nightRaid, 1000); return; }
   const h = hour();
   if (!(h >= 21 || h < 5)) return;
   const obj = activeObjectives('mq_night_of_ash').find((o) => o.id === 'defend');
