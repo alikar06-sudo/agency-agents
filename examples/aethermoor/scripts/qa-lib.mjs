@@ -5,10 +5,11 @@ import { existsSync, mkdirSync } from 'node:fs';
 export const OUT = new URL('../qa-output/', import.meta.url).pathname;
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 
-export async function launch(url = process.env.QA_URL || 'http://127.0.0.1:5173/', viewport = { width: 1440, height: 860 }) {
+export async function launch(url = process.env.QA_URL || 'http://127.0.0.1:5173/', viewport = { width: 1440, height: 860 }, initScript = null) {
   const exe = ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => existsSync(p));
   const browser = await chromium.launch({ executablePath: exe, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport });
+  if (initScript) await page.addInitScript(initScript);
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push('PAGEERROR ' + e.message + '\n' + (e.stack ?? '').split('\n').slice(0, 4).join('\n')));

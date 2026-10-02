@@ -151,6 +151,34 @@ export function roofTexture(): THREE.Texture {
   return finish(c, key);
 }
 
+// Потолок: тёмные балки над залами и классами или грубый свод подземелий.
+export function ceilingTexture(style: 'beams' | 'stone'): THREE.Texture {
+  const key = 'ceiling_' + style;
+  if (cache.has(key)) return cache.get(key)!;
+  const [c, ctx] = canvas(128, 128);
+  const r = rng(style === 'beams' ? 41 : 43);
+  if (style === 'beams') {
+    noiseFill(ctx, 128, 128, [52, 40, 32], 10, r);
+    for (let i = 0; i < 4; i++) {
+      const y = i * 32;
+      ctx.fillStyle = 'rgba(20,14,10,0.55)';
+      ctx.fillRect(0, y, 128, 3);
+      ctx.fillStyle = 'rgba(120,90,60,0.12)';
+      ctx.fillRect(0, y + 3, 128, 2);
+    }
+    ctx.fillStyle = '#2a1d14';
+    ctx.fillRect(56, 0, 16, 128);
+    ctx.fillStyle = 'rgba(255,220,170,0.08)';
+    ctx.fillRect(58, 0, 3, 128);
+  } else {
+    noiseFill(ctx, 128, 128, [70, 66, 62], 22, r);
+    ctx.strokeStyle = 'rgba(20,18,16,0.55)';
+    ctx.lineWidth = 2;
+    for (let y = 0; y < 128; y += 32) for (let x = (y / 32) % 2 ? 0 : 32; x < 128; x += 64) ctx.strokeRect(x + 1, y + 1, 62, 30);
+  }
+  return finish(c, key);
+}
+
 export type FloorStyle =
   | 'stone' | 'flag' | 'wood' | 'carpet' | 'grass' | 'dirt' | 'cobble' | 'sand' | 'dungeon' | 'ruins' | 'sanctum' | 'snow' | 'marble';
 

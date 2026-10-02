@@ -377,6 +377,7 @@ export interface ZoneDef {
   unlock?: Cond[];
   lockedText?: string;
   wallHeight?: number;
+  skyCeiling?: [number, number, number, number]; // зачарованный звёздный потолок: col0, row0, col1, row1
   waystone?: string;       // id точки быстрого перемещения
   mapPos: [number, number];// положение на карте мира (0..1)
 }

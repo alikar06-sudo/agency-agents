@@ -20,13 +20,17 @@ import { input, boundKey } from '@/core/input';
 import { audio } from '@/core/audio';
 import type { Mood } from '@/core/audio';
 import { bus } from '@/core/bus';
-import { G, hasGame, isModalOpen, mutate, setUI, ui, useSettings, banner, toast } from '@/state/store';
+import { G, hasGame, isModalOpen, mutate, setUI, setSettings, ui, useSettings, useUI, banner, toast } from '@/state/store';
 import { tickTime, daylight, hour, currentWeather, isNight } from '@/systems/time';
 import { derived } from '@/systems/player';
 import { checkAll } from '@/systems/logic';
 import { autosave } from '@/systems/save';
 import type { LightSource } from './props';
 import { blockedCell } from './physics';
+import { ViewModel } from './viewmodel';
+
+export type CamMode = 'iso' | 'third' | 'first';
+const MODE_NAMES: Record<CamMode, string> = { iso: 'Вид сверху', third: 'Вид из-за плеча', first: 'Вид от первого лица' };
 
 const POOL = 8;
 
@@ -81,6 +85,13 @@ export class Engine {
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1);
   aim = new THREE.Vector3();
   focus: { x: number; z: number } | null = null;
+  // обзор: yaw — направление взгляда (вперёд = (sin yaw, cos yaw)), pitch — наклон вверх/вниз
+  mode: CamMode = 'iso';
+  yaw = 0;
+  pitch = -0.08;
+  view!: ViewModel;
+  private ownUnlock = false;
+  private camSmooth = new THREE.Vector3();
   title = false;
   private titleT = 0;
   private zoneMood: Mood = 'castle';
@@ -121,6 +132,26 @@ export class Engine {
     this.combat = new Combat(this);
     this.interact = new InteractManager(this);
     input.attach(canvas);
+    this.scene.add(this.camera);
+    this.view = new ViewModel();
+    this.camera.add(this.view.group);
+    input.wantLock = () => this.mode !== 'iso' && !this.title && hasGame() && !isModalOpen() && !this.loading;
+    input.onLockChange = (locked) => {
+      setUI({ lookLocked: locked });
+      // Esc снимает захват мыши — открываем паузу, как в большинстве игр
+      if (!locked && !this.ownUnlock && this.mode !== 'iso' && hasGame() && ui().screen === 'game' && !isModalOpen()) setUI({ pauseMenu: true });
+      this.ownUnlock = false;
+    };
+    useUI.subscribe((st) => {
+      if (input.locked && isModalOpen(st)) { this.ownUnlock = true; input.exitLock(); }
+    });
+    input.onAction((a) => {
+      if (a !== 'view' || this.title || !hasGame() || isModalOpen()) return;
+      const order: CamMode[] = ['first', 'third', 'iso'];
+      const next = order[(order.indexOf(useSettings.getState().camera) + 1) % order.length];
+      setSettings({ camera: next });
+      toast('info', MODE_NAMES[next], next === 'iso' ? 'Мышь — прицел, колесо — масштаб.' : 'Щёлкните, чтобы управлять взглядом мышью. V — сменить вид.');
+    });
     this.applyQuality();
     this.resize();
     window.addEventListener('resize', this.resize);
@@ -190,7 +221,10 @@ export class Engine {
     this.width = w; this.height = h;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    this.camera.fov = w < h ? 60 : 45;
+    const st = useSettings.getState();
+    if (this.mode === 'first') { this.camera.fov = w < h ? st.fov + 10 : st.fov; this.camera.near = 0.05; }
+    else if (this.mode === 'third') { this.camera.fov = w < h ? 74 : 62; this.camera.near = 0.1; }
+    else { this.camera.fov = w < h ? 60 : 45; this.camera.near = 0.5; }
     this.camera.updateProjectionMatrix();
     const pr = this.renderer.getPixelRatio();
     if (this.composer) {
@@ -252,6 +286,8 @@ export class Engine {
         px = sp.x; pz = sp.z; facing = sp.facing;
       }
       this.player.place(px, pz, facing);
+      this.yaw = facing;
+      this.pitch = -0.08;
       this.exitArmed = false;
       this.reached.clear();
       this.npcs.syncZone(true);
@@ -449,6 +485,8 @@ export class Engine {
     const a = Math.sin(this.titleT * 0.05) * 0.35;
     this.camera.position.set(cx + Math.sin(a) * 26, 4.5, cz + Math.cos(a) * 26);
     this.camera.lookAt(cx, 9, cz - 24);
+    this.sky.position.copy(this.camera.position);
+    this.view.group.visible = false;
     this.updateLighting(dt, true);
     this.particles.update(dt);
     this.weather.update(dt, this.camera.position.x, cz, this.titleT);
@@ -474,8 +512,25 @@ export class Engine {
 
   leaveTitle(): void {
     this.title = false;
-    cutaway.uCut.value = 1;
-    this.player.rig.root.visible = true;
+    this.mode = 'iso';
+    this.applyViewMode(true);
+  }
+
+  // Применить режим камеры: потолки, прорезь стен, видимость тела героя, рук и прицела.
+  applyViewMode(force = false): void {
+    const want = useSettings.getState().camera;
+    if (!force && want === this.mode) return;
+    this.mode = want;
+    cutaway.uCut.value = this.mode === 'iso' ? 1 : 0;
+    this.zone?.setLookMode(this.mode !== 'iso');
+    input.arrowTurn = this.mode !== 'iso';
+    if (this.mode === 'iso') { this.ownUnlock = true; input.exitLock(); }
+    if (this.player) {
+      this.player.rig.root.visible = !this.title && this.mode !== 'first';
+      if (this.mode !== 'iso') this.yaw = this.player.facing;
+    }
+    this.camSmooth.set(0, 0, 0);
+    this.resize();
   }
 
   // ---------------- Свет и время суток ----------------
@@ -498,12 +553,12 @@ export class Engine {
       this.scene.fog = this.scene.fog instanceof THREE.Fog ? this.scene.fog : new THREE.Fog(fogC, 10, 60);
       const fog = this.scene.fog as THREE.Fog;
       fog.color.copy(fogC);
-      const extra = this.cameraOffset().length() - 18;
+      const extra = this.mode === 'iso' ? this.cameraOffset().length() - 18 : 0;
       const fogFar = (weather === 'fog' ? 32 : weather === 'snow' ? 50 : weather === 'rain' ? 56 : def.fog[1]) + extra;
       fog.near = titleMode ? 25 : def.fog[0] + extra;
       fog.far = titleMode ? 110 : fogFar;
       this.scene.background = fogC;
-      this.sky.visible = titleMode;
+      this.sky.visible = titleMode || this.mode !== 'iso';
       this.skyUniforms.uTop.value.copy(nightC.clone().lerp(new THREE.Color(0x4a78b8), d));
       this.skyUniforms.uHorizon.value.copy(fogC);
       this.skyUniforms.uNight.value = 1 - d;
@@ -519,7 +574,7 @@ export class Engine {
       this.scene.fog = this.scene.fog instanceof THREE.Fog ? this.scene.fog : new THREE.Fog(base, 10, 50);
       const fog = this.scene.fog as THREE.Fog;
       fog.color.copy(base);
-      const extraIn = this.cameraOffset().length() - 18;
+      const extraIn = this.mode === 'iso' ? this.cameraOffset().length() - 18 : 0;
       fog.near = def.fog[0] + extraIn;
       fog.far = def.fog[1] + extraIn;
       this.scene.background = base;
@@ -608,6 +663,7 @@ export class Engine {
   // ---------------- Камера ----------------
 
   snapCamera(): void {
+    this.camSmooth.set(0, 0, 0);
     this.camTarget.set(this.player.x, 1, this.player.z);
     this.camPos.copy(this.camTarget).add(this.cameraOffset());
     this.camera.position.copy(this.camPos);
@@ -621,8 +677,22 @@ export class Engine {
     return new THREE.Vector3(0, 19.5, 14.5).multiplyScalar(zoom * dlg * portrait);
   }
 
+  // Направление взгляда в плоскости XZ.
+  forward(): { x: number; z: number } { return { x: Math.sin(this.yaw), z: Math.cos(this.yaw) }; }
+
   private updateCamera(dt: number): void {
     if (!this.player || !this.zone || this.title) return;
+    this.applyViewMode();
+    if (this.zone.ceiling && this.zone.ceiling.visible !== (this.mode !== 'iso')) this.zone.setLookMode(this.mode !== 'iso');
+    if (this.mode === 'iso') this.updateIsoCamera(dt);
+    else this.updateLookCamera(dt);
+    cutaway.uFocus.value.set(this.player.x, 0, this.player.z);
+    audio.setListener(this.player.x, this.player.z);
+    this.sky.visible = this.mode !== 'iso' && !!this.zone.def.outdoor;
+    this.sky.position.copy(this.camera.position);
+  }
+
+  private updateIsoCamera(dt: number): void {
     if (input.wheel && !isModalOpen()) {
       const z = Math.max(0.6, Math.min(1.5, useSettings.getState().zoom + input.wheel * 0.07));
       useSettings.setState({ zoom: z });
@@ -642,19 +712,102 @@ export class Engine {
     const desired = this.camTarget.clone().add(this.cameraOffset());
     this.camPos.lerp(desired, k);
     this.camera.position.copy(this.camPos);
-    if (this.shake > 0 && useSettings.getState().shake) {
-      this.camera.position.x += (Math.random() - 0.5) * this.shake;
-      this.camera.position.y += (Math.random() - 0.5) * this.shake;
-      this.shake = Math.max(0, this.shake - dt * 2.5);
-    }
+    this.applyShake(dt);
     this.camera.lookAt(this.camTarget);
-    cutaway.uFocus.value.set(this.player.x, 0, this.player.z);
-    audio.setListener(this.player.x, this.player.z);
+    this.view.group.visible = false;
     // прицел мышью — точка на плоскости y=1
     if (input.mouse.inside) {
       this.stepRaycaster.setFromCamera(new THREE.Vector2(input.mouse.nx, input.mouse.ny), this.camera);
       const hit = new THREE.Vector3();
       if (this.stepRaycaster.ray.intersectPlane(this.groundPlane, hit)) this.aim.copy(hit);
+    }
+  }
+
+  // Обзор от первого лица и из-за плеча: мышь, стрелки, сенсорный экран.
+  private updateLookCamera(dt: number): void {
+    const st = useSettings.getState();
+    const modal = isModalOpen();
+    const sens = st.sensitivity;
+    if (!modal) {
+      if (input.locked) {
+        this.yaw -= input.mouse.dx * 0.0022 * sens;
+        this.pitch -= input.mouse.dy * 0.0022 * sens * (st.invertY ? -1 : 1);
+      } else if (input.lockFailed && input.mouse.inside) {
+        // без захвата мыши: камера поворачивается, когда курсор у края экрана
+        const ex = Math.abs(input.mouse.nx) > 0.6 ? (Math.abs(input.mouse.nx) - 0.6) / 0.4 : 0;
+        const ey = Math.abs(input.mouse.ny) > 0.65 ? (Math.abs(input.mouse.ny) - 0.65) / 0.35 : 0;
+        this.yaw -= Math.sign(input.mouse.nx) * ex * 2.6 * sens * dt;
+        this.pitch += Math.sign(input.mouse.ny) * ey * 1.6 * sens * dt * (st.invertY ? -1 : 1);
+      }
+      this.yaw += ((input.isCode('ArrowLeft') ? 1 : 0) - (input.isCode('ArrowRight') ? 1 : 0)) * 2.4 * dt;
+      this.yaw -= input.touch.lookX * 0.006 * sens;
+      this.pitch -= input.touch.lookY * 0.005 * sens * (st.invertY ? -1 : 1);
+    }
+    // в разговоре взгляд плавно поворачивается к собеседнику
+    if (this.focus) {
+      const target = Math.atan2(this.focus.x - this.player.x, this.focus.z - this.player.z);
+      let diff = target - this.yaw;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this.yaw += diff * Math.min(1, dt * 5);
+      this.pitch += ((this.mode === 'first' ? -0.04 : -0.18) - this.pitch) * Math.min(1, dt * 4);
+    }
+    this.pitch = this.mode === 'first' ? Math.max(-1.35, Math.min(1.3, this.pitch)) : Math.max(-1.0, Math.min(0.55, this.pitch));
+    const p = this.player;
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    if (this.mode === 'first') {
+      const eye = p.rig.height * 0.93;
+      const bob = Math.sin(this.now * 8.5) * 0.035 * p.moving;
+      const dodgeDip = p.dodgeT > 0 ? Math.sin((1 - p.dodgeT / 0.32) * Math.PI) * 0.55 : 0;
+      this.camera.position.set(p.x + fx * 0.08, eye + bob - dodgeDip, p.z + fz * 0.08);
+      this.camera.rotation.set(this.pitch, this.yaw + Math.PI, 0, 'YXZ');
+      this.applyShake(dt);
+      this.view.group.visible = !ui().dialogue && G().player.hp > 0;
+      this.view.update(dt, p.moving, input.isDown('sprint'), p.shielding ? 0 : p.castAnim, p.shielding, dodgeDip);
+    } else {
+      if (input.wheel && !modal) {
+        const z = Math.max(0.6, Math.min(1.5, st.zoom + input.wheel * 0.07));
+        useSettings.setState({ zoom: z });
+      }
+      const dist = 4.4 * st.zoom * (ui().dialogue ? 0.8 : 1);
+      const rx = -fz, rz = fx;   // вправо от взгляда
+      const shoulder = ui().dialogue ? 0.2 : 0.55;
+      const pivot = new THREE.Vector3(p.x + rx * shoulder, 1.65, p.z + rz * shoulder);
+      const dir = new THREE.Vector3(fx * cp, sp, fz * cp);
+      // камера не проходит сквозь стены: шагаем от героя к желаемой точке
+      const g = this.zone!.grid;
+      let free = dist;
+      for (let t = 0.3; t <= dist; t += 0.15) {
+        const x = pivot.x - dir.x * t, z = pivot.z - dir.z * t, y = pivot.y - dir.y * t;
+        const c = Math.floor(x / TS), r = Math.floor(z / TS);
+        const wall = c < 0 || r < 0 || c >= g.w || r >= g.h || g.wall[r * g.w + c] === 1;
+        if (wall || (y > this.zone!.lookWallH - 0.2 && !this.zone!.def.outdoor) || y < 0.25) { free = Math.max(0.35, t - 0.35); break; }
+      }
+      const want = pivot.clone().addScaledVector(dir, -free);
+      if (this.camSmooth.lengthSq() === 0) this.camSmooth.copy(want);
+      this.camSmooth.lerp(want, 1 - Math.exp(-dt * (free < dist ? 30 : 14)));
+      this.camera.position.copy(this.camSmooth);
+      this.applyShake(dt);
+      this.camera.lookAt(pivot.clone().addScaledVector(dir, 10));
+      this.view.group.visible = false;
+      // если камера почти упёрлась в героя — прячем его, чтобы не закрывал обзор
+      p.rig.root.visible = free > 0.9;
+    }
+    // прицел: точка впереди по направлению взгляда; без захвата мыши — под курсором
+    if (input.lockFailed && input.mouse.inside && !input.touch.active) {
+      this.stepRaycaster.setFromCamera(new THREE.Vector2(input.mouse.nx, input.mouse.ny), this.camera);
+      const hit = new THREE.Vector3();
+      if (this.stepRaycaster.ray.intersectPlane(this.groundPlane, hit) && Math.hypot(hit.x - p.x, hit.z - p.z) < 40) { this.aim.copy(hit); return; }
+    }
+    this.aim.set(p.x + fx * 18, 1, p.z + fz * 18);
+  }
+
+  private applyShake(dt: number): void {
+    if (this.shake > 0 && useSettings.getState().shake) {
+      this.camera.position.x += (Math.random() - 0.5) * this.shake * (this.mode === 'iso' ? 1 : 0.25);
+      this.camera.position.y += (Math.random() - 0.5) * this.shake * (this.mode === 'iso' ? 1 : 0.25);
+      this.shake = Math.max(0, this.shake - dt * 2.5);
     }
   }
 
@@ -713,10 +866,12 @@ export class Engine {
   nearestUsable(): { text: string; sub?: string; use: () => void } | null {
     const px = this.player.x, pz = this.player.z;
     let best: { text: string; sub?: string; use: () => void } | null = null;
-    let bestD = 2.6;
-    const npc = this.npcs.nearest(px, pz, 2.6);
+    const dir = this.mode !== 'iso' ? this.forward() : undefined;
+    const reach = dir ? 3.2 : 2.6;
+    let bestD = reach;
+    const npc = this.npcs.nearest(px, pz, reach, dir);
     if (npc) { best = { text: 'Поговорить', sub: npc.def.name, use: () => npc.talk() }; bestD = npc.dist; }
-    const it = this.interact.nearest(px, pz, 2.4);
+    const it = this.interact.nearest(px, pz, dir ? 3.0 : 2.4, dir);
     if (it && it.dist < bestD) {
       const p = it.item.prompt();
       if (p) best = { text: p.text, sub: p.sub, use: () => it.item.use() };

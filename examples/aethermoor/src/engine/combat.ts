@@ -90,6 +90,20 @@ export class Combat {
 
   private aimPoint(): THREE.Vector3 {
     const p = this.eng.player;
+    if (this.eng.mode !== 'iso') {
+      // обзор от первого лица / из-за плеча: цель по центру экрана с мягким доведением
+      const f = this.eng.forward();
+      let best: EnemyEntity | null = null, bestScore = Math.cos(0.2);
+      for (const e of this.eng.enemies) {
+        if (e.dead || e.st.pacified > this.eng.now) continue;
+        const dx = e.x - p.x, dz = e.z - p.z, d = Math.hypot(dx, dz);
+        if (d > 22 || d < 0.3) continue;
+        const cos = (dx * f.x + dz * f.z) / d;
+        if (cos > bestScore && lineOfSight(this.eng.zone!.grid, p.x, p.z, e.x, e.z)) { bestScore = cos; best = e; }
+      }
+      if (best) return this.aim.set(best.x, 1, best.z);
+      return this.aim.copy(this.eng.aim);
+    }
     if (input.touch.active || !input.mouse.inside) {
       // автонаведение на ближайшего врага
       let best: EnemyEntity | null = null, bd = 14;

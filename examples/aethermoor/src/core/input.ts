@@ -3,14 +3,14 @@
 export type Action =
   | 'up' | 'down' | 'left' | 'right' | 'sprint' | 'dodge' | 'interact' | 'attack' | 'shield'
   | 'spell1' | 'spell2' | 'spell3' | 'spell4' | 'spell5' | 'spell6' | 'potion'
-  | 'inventory' | 'spells' | 'quests' | 'map' | 'character' | 'relations' | 'journal' | 'menu' | 'wait';
+  | 'inventory' | 'spells' | 'quests' | 'map' | 'character' | 'relations' | 'journal' | 'menu' | 'wait' | 'view';
 
 export const KEYMAP: Record<string, Action> = {
   KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
   ShiftLeft: 'sprint', ShiftRight: 'sprint', Space: 'dodge', KeyE: 'interact', KeyF: 'interact',
   Digit1: 'spell1', Digit2: 'spell2', Digit3: 'spell3', Digit4: 'spell4', Digit5: 'spell5', Digit6: 'spell6',
   KeyQ: 'potion', KeyI: 'inventory', Tab: 'inventory', KeyK: 'spells', KeyJ: 'quests', KeyM: 'map', KeyC: 'character',
-  KeyR: 'relations', KeyL: 'journal', Escape: 'menu', KeyT: 'wait',
+  KeyR: 'relations', KeyL: 'journal', Escape: 'menu', KeyT: 'wait', KeyV: 'view',
 };
 
 // Переназначаемые действия: основная клавиша по умолчанию и подпись в настройках.
@@ -37,6 +37,7 @@ export const REBINDABLE: { action: Action; name: string; def: string }[] = [
   { action: 'relations', name: 'Отношения', def: 'KeyR' },
   { action: 'journal', name: 'Дневник', def: 'KeyL' },
   { action: 'wait', name: 'Ожидание', def: 'KeyT' },
+  { action: 'view', name: 'Смена вида', def: 'KeyV' },
 ];
 
 const SPECIAL: Record<string, string> = {
@@ -94,23 +95,52 @@ export const KEY_LABELS: { action: string; keys: string }[] = [
   { action: 'Отношения', keys: 'R' },
   { action: 'Дневник', keys: 'L' },
   { action: 'Ожидание / время', keys: 'T' },
+  { action: 'Обзор (вид от первого лица / из-за плеча)', keys: 'мышь' },
+  { action: 'Поворот камеры с клавиатуры', keys: '← →' },
   { action: 'Меню / пауза', keys: 'Esc' },
 ];
 
 class Input {
   private down = new Set<Action>();
   private pressed = new Set<Action>();
-  mouse = { x: 0, y: 0, nx: 0, ny: 0, left: false, right: false, leftPressed: false, rightPressed: false, inside: false };
+  private codes = new Set<string>();
+  mouse = { x: 0, y: 0, nx: 0, ny: 0, left: false, right: false, leftPressed: false, rightPressed: false, inside: false, dx: 0, dy: 0 };
   wheel = 0;
-  touch = { moveX: 0, moveY: 0, aim: false, aimX: 0, aimY: 0, active: false };
+  touch = { moveX: 0, moveY: 0, aim: false, aimX: 0, aimY: 0, active: false, lookX: 0, lookY: 0 };
   private listeners: (() => void)[] = [];
   private actionHandlers = new Set<(a: Action) => void>();
   enabled = true;
+  // Режимы обзора от первого лица / из-за плеча: стрелки ← → поворачивают камеру,
+  // а щелчок по холсту захватывает указатель мыши для обзора.
+  arrowTurn = false;
+  wantLock: () => boolean = () => false;
+  onLockChange: (locked: boolean) => void = () => {};
+  lockFailed = false;
+  private canvas: HTMLElement | null = null;
+  private touchLookId: number | null = null;
+  private touchLast = { x: 0, y: 0 };
+
+  get locked(): boolean { return !!this.canvas && document.pointerLockElement === this.canvas; }
+
+  requestLock(): void {
+    if (!this.canvas || this.locked || this.lockFailed) return;
+    try {
+      const r = (this.canvas as HTMLElement & { requestPointerLock(o?: unknown): Promise<void> | void }).requestPointerLock();
+      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => { this.lockFailed = true; this.onLockChange(false); });
+    } catch { this.lockFailed = true; }
+  }
+
+  exitLock(): void { if (this.locked) document.exitPointerLock(); }
+
+  isCode(code: string): boolean { return this.codes.has(code); }
 
   attach(canvas: HTMLElement): void {
+    this.canvas = canvas;
     const onKeyDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      this.codes.add(e.code);
+      if (this.arrowTurn && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { e.preventDefault(); return; }
       const a = effective[e.code];
       if (!a) return;
       if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -118,11 +148,20 @@ class Input {
       this.down.add(a);
     };
     const onKeyUp = (e: KeyboardEvent) => {
+      this.codes.delete(e.code);
       const a = effective[e.code];
       if (a) this.down.delete(a);
     };
     const onMove = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') return;
+      if (e.pointerType === 'touch') {
+        if (e.pointerId === this.touchLookId) {
+          this.touch.lookX += e.clientX - this.touchLast.x;
+          this.touch.lookY += e.clientY - this.touchLast.y;
+          this.touchLast = { x: e.clientX, y: e.clientY };
+        }
+        return;
+      }
+      if (this.locked) { this.mouse.dx += e.movementX; this.mouse.dy += e.movementY; this.mouse.inside = true; return; }
       const r = canvas.getBoundingClientRect();
       this.mouse.x = e.clientX - r.left;
       this.mouse.y = e.clientY - r.top;
@@ -131,18 +170,29 @@ class Input {
       this.mouse.inside = true;
     };
     const onDown = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') return;
+      if (e.pointerType === 'touch') {
+        if (this.touchLookId === null) { this.touchLookId = e.pointerId; this.touchLast = { x: e.clientX, y: e.clientY }; }
+        return;
+      }
+      // первый щелчок в режимах обзора захватывает мышь и не считается выстрелом
+      if (!this.locked && !this.lockFailed && this.wantLock()) { this.requestLock(); return; }
       onMove(e);
       if (e.button === 0) { this.mouse.left = true; this.mouse.leftPressed = true; }
       if (e.button === 2) { this.mouse.right = true; this.mouse.rightPressed = true; }
     };
     const onUp = (e: PointerEvent) => {
+      if (e.pointerId === this.touchLookId) this.touchLookId = null;
       if (e.button === 0) this.mouse.left = false;
       if (e.button === 2) this.mouse.right = false;
     };
     const onWheel = (e: WheelEvent) => { this.wheel += Math.sign(e.deltaY); };
     const onCtx = (e: Event) => e.preventDefault();
-    const onBlur = () => { this.down.clear(); this.mouse.left = false; this.mouse.right = false; };
+    const onBlur = () => { this.down.clear(); this.codes.clear(); this.mouse.left = false; this.mouse.right = false; };
+    const onLock = () => { if (!this.locked) { this.mouse.left = false; this.mouse.right = false; } this.onLockChange(this.locked); };
+    const onLockError = () => { this.lockFailed = true; this.onLockChange(false); };
+    document.addEventListener('pointerlockchange', onLock);
+    document.addEventListener('pointerlockerror', onLockError);
+    this.listeners.push(() => document.removeEventListener('pointerlockchange', onLock), () => document.removeEventListener('pointerlockerror', onLockError));
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     canvas.addEventListener('pointermove', onMove);
@@ -181,10 +231,12 @@ class Input {
     this.pressed.clear();
     this.mouse.leftPressed = false;
     this.mouse.rightPressed = false;
+    this.mouse.dx = 0; this.mouse.dy = 0;
+    this.touch.lookX = 0; this.touch.lookY = 0;
     this.wheel = 0;
   }
 
-  clear(): void { this.down.clear(); this.pressed.clear(); this.mouse.left = false; this.mouse.right = false; }
+  clear(): void { this.down.clear(); this.pressed.clear(); this.codes.clear(); this.mouse.left = false; this.mouse.right = false; }
 }
 
 export const input = new Input();

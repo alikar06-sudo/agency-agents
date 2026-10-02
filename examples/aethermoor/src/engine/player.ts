@@ -74,7 +74,10 @@ export class PlayerEntity {
     if (hatItem) rig.setHat(hatItem.id === 'moon_hat' ? 'tall' : 'pointed', ITEMS[hatItem.id]?.color);
     rig.wand.visible = true;
     const wd = wandItem ? ITEMS[wandItem.id] : null;
-    rig.setWandColor(wd?.color ?? '#6a4a2a', wd?.element === 'fire' ? 0xffa060 : wd?.element === 'frost' ? 0xa0e0ff : wd?.element === 'storm' ? 0xb0c0ff : 0xfff0c0);
+    const glow = wd?.element === 'fire' ? 0xffa060 : wd?.element === 'frost' ? 0xa0e0ff : wd?.element === 'storm' ? 0xb0c0ff : 0xfff0c0;
+    rig.setWandColor(wd?.color ?? '#6a4a2a', glow);
+    this.eng.view?.setLook({ skin: a.skin, robe: look.robe, trim: circle.color, wand: wd?.color ?? '#6a4a2a', glow });
+    rig.root.visible = this.eng.mode !== 'first' && !this.eng.title;
     this.lookKey = this.currentLookKey();
   }
 
@@ -97,6 +100,7 @@ export class PlayerEntity {
 
   wandTipWorld(): THREE.Vector3 {
     const v = new THREE.Vector3();
+    if (this.eng.mode === 'first' && this.eng.view?.group.visible) return this.eng.view.tipWorld(v);
     this.rig.wandTip.getWorldPosition(v);
     return v;
   }
@@ -130,6 +134,13 @@ export class PlayerEntity {
       if (input.isDown('left')) mx -= 1;
       if (input.isDown('right')) mx += 1;
       if (input.touch.active) { mx += input.touch.moveX; mz += input.touch.moveY; }
+    }
+    // в режимах обзора «вперёд» — это направление взгляда камеры
+    const look = this.eng.mode !== 'iso';
+    if (look) {
+      const fx = Math.sin(this.eng.yaw), fz = Math.cos(this.eng.yaw);
+      const wx = fx * -mz + -fz * mx, wz = fz * -mz + fx * mx;
+      mx = wx; mz = wz;
     }
     const ml = Math.hypot(mx, mz);
     if (ml > 1) { mx /= ml; mz /= ml; }
@@ -190,7 +201,8 @@ export class PlayerEntity {
     const aimDir = this.eng.screenToWorldDir();
     if (this.dodgeT <= 0) {
       let targetFacing = this.facing;
-      if (this.aimFaceUntil > now || this.shielding) targetFacing = Math.atan2(aimDir.x, aimDir.z);
+      if (this.eng.mode === 'first') targetFacing = this.eng.yaw;
+      else if (this.aimFaceUntil > now || this.shielding) targetFacing = Math.atan2(aimDir.x, aimDir.z);
       else if (ml > 0.1) targetFacing = Math.atan2(mx, mz);
       let diff = targetFacing - this.facing;
       while (diff > Math.PI) diff -= Math.PI * 2;

@@ -1,9 +1,9 @@
 // Сборка зоны из ASCII-карты: пол, стены, декор, вода, маркеры, источники света, мини-карта.
 import * as THREE from 'three';
 import type { MarkerDef, ZoneDef } from '@/data/types';
-import { floorTexture, wallTexture, wallTopTexture, roofTexture, waterNormal, windowTexture, bannerTexture, signTexture } from './textures';
+import { floorTexture, wallTexture, wallTopTexture, roofTexture, ceilingTexture, waterNormal, windowTexture, bannerTexture, signTexture } from './textures';
 import type { FloorStyle, WallStyle } from './textures';
-import { withCutaway, colorMat, stdMat } from './materials';
+import { withCutaway, colorMat, stdMat, cutaway } from './materials';
 import { Batcher, buildProp, SOLID_PROPS, LOW_PROPS } from './props';
 import type { LightSource } from './props';
 import { sharedGeo as SG } from './models';
@@ -44,6 +44,9 @@ export interface BuiltZone {
   waterMat: THREE.MeshStandardMaterial | null;
   width: number; depth: number;
   wallH: number;
+  ceiling: THREE.InstancedMesh | null;
+  lookWallH: number;
+  setLookMode(on: boolean): void;
   dispose(): void;
 }
 
@@ -129,6 +132,33 @@ function floorMaterial(style: FloorStyle): THREE.Material {
 }
 
 const planeGeo = new THREE.PlaneGeometry(TS, TS).rotateX(-Math.PI / 2);
+const ceilGeo = new THREE.PlaneGeometry(TS, TS).rotateX(Math.PI / 2);
+
+// Звёздное небо на потолке: мировые координаты задают узор, туман не действует.
+let enchantedMat: THREE.ShaderMaterial | null = null;
+function enchantedCeilingMaterial(): THREE.ShaderMaterial {
+  if (enchantedMat) return enchantedMat;
+  enchantedMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: cutaway.uTime },
+    vertexShader: `varying vec3 vW; void main(){ vec4 w = modelMatrix * instanceMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `
+      uniform float uTime; varying vec3 vW;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      void main(){
+        vec2 p = vW.xz * 0.9;
+        vec3 col = mix(vec3(0.03, 0.04, 0.10), vec3(0.08, 0.10, 0.22), 0.5 + 0.5 * sin(p.x * 0.07 + p.y * 0.05));
+        float cloud = sin(p.x * 0.21 + uTime * 0.05) * sin(p.y * 0.17 - uTime * 0.04);
+        col += vec3(0.06, 0.07, 0.12) * smoothstep(0.2, 0.9, cloud);
+        vec2 cell = floor(p * 3.0);
+        vec2 f = fract(p * 3.0) - 0.5 - (vec2(hash(cell + 3.1), hash(cell + 7.7)) - 0.5) * 0.7;
+        float st = step(0.93, hash(cell)) * smoothstep(0.09, 0.0, length(f));
+        st *= 0.6 + 0.4 * sin(uTime * 2.0 + hash(cell) * 40.0);
+        col += st * vec3(1.0, 0.95, 0.85);
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  return enchantedMat;
+}
 const boxGeo = new THREE.BoxGeometry(TS, 1, TS).translate(0, 0.5, 0);
 
 export interface BuildOptions { snow: boolean; seed?: number }
@@ -257,9 +287,14 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
   }
 
   // ---------- стены ----------
-  const addWalls = (cells: [number, number][], height: number) => {
+  const isoWalls: THREE.Object3D[] = [];
+  const lookExtras: THREE.Object3D[] = [];
+  const lookWalls: THREE.Object3D[] = [];
+  const addWalls = (cells: [number, number][], height: number, role: 'iso' | 'look' | 'both' = 'both') => {
     if (!cells.length) return;
     const im = new THREE.InstancedMesh(boxGeo, wallMaterials(style, height), cells.length);
+    if (role === 'iso') isoWalls.push(im);
+    if (role === 'look') { lookWalls.push(im); im.visible = false; }
     cells.forEach(([c, r], k) => {
       const [x, z] = cellCenter(c, r);
       dummy.position.set(x, 0, z);
@@ -275,8 +310,46 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
     im.receiveShadow = true;
     group.add(im);
   };
-  addWalls(walls, wallH);
+  // Внутри помещений для обзора от первого лица стены выше, чтобы залы ощущались просторными.
+  const lookWallH = def.outdoor ? wallH : (def.theme === 'castle' || def.theme === 'library' || def.theme === 'tower' ? 6.4 : 4.8);
+  if (lookWallH !== wallH) { addWalls(walls, wallH, 'iso'); addWalls(walls, lookWallH, 'look'); }
+  else addWalls(walls, wallH);
   addWalls(tall, tallH);
+
+  // ---------- потолок (виден только в режимах обзора от первого лица и из-за плеча) ----------
+  let ceiling: THREE.InstancedMesh | null = null;
+  if (!def.outdoor) {
+    const cells: [number, number][] = [];
+    for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+      const ch = charAt(c, r);
+      if (!isWallCh(ch) && ch !== '_') cells.push([c, r]);
+    }
+    // зачарованный потолок Большого зала показывает ночное небо
+    const sc = def.skyCeiling;
+    const inSky = (c: number, r: number) => !!sc && c >= sc[0] && c <= sc[2] && r >= sc[1] && r <= sc[3];
+    const skyCells = cells.filter(([c, r]) => inSky(c, r));
+    if (skyCells.length) {
+      const sky = new THREE.InstancedMesh(ceilGeo, enchantedCeilingMaterial(), skyCells.length);
+      const m4 = new THREE.Matrix4();
+      skyCells.forEach(([c, r], i) => { const [x, z] = cellCenter(c, r); m4.makeTranslation(x, lookWallH, z); sky.setMatrixAt(i, m4); });
+      sky.instanceMatrix.needsUpdate = true;
+      sky.visible = false;
+      lookExtras.push(sky);
+      group.add(sky);
+      cells.splice(0, cells.length, ...cells.filter(([c, r]) => !inSky(c, r)));
+    }
+    if (cells.length) {
+      const style = def.theme === 'dungeon' || def.theme === 'sanctum' || def.dark ? 'stone' : 'beams';
+      const mat = new THREE.MeshStandardMaterial({ map: ceilingTexture(style), roughness: 0.95, color: style === 'stone' ? 0x9a9488 : 0xffffff });
+      ceiling = new THREE.InstancedMesh(ceilGeo, mat, cells.length);
+      const m4 = new THREE.Matrix4();
+      cells.forEach(([c, r], i) => { const [x, z] = cellCenter(c, r); m4.makeTranslation(x, lookWallH, z); ceiling!.setMatrixAt(i, m4); });
+      ceiling.instanceMatrix.needsUpdate = true;
+      ceiling.visible = false;
+      ceiling.name = 'ceiling';
+      group.add(ceiling);
+    }
+  }
 
   // ---------- украшения стен: факелы, окна, знамёна ----------
   const decoSide = (c: number, r: number): [number, number] | null => {
@@ -393,7 +466,13 @@ export function buildZone(def: ZoneDef, opts: BuildOptions): BuiltZone {
 
   return {
     def, group, grid, markers, lights, minimap, waterMat,
-    width: w * TS, depth: h * TS, wallH,
+    width: w * TS, depth: h * TS, wallH, lookWallH, ceiling,
+    setLookMode(on: boolean) {
+      if (ceiling) ceiling.visible = on;
+      for (const o of isoWalls) o.visible = !on;
+      for (const o of lookWalls) o.visible = on;
+      for (const o of lookExtras) o.visible = on;
+    },
     dispose() {
       group.traverse((o) => {
         const m = o as THREE.Mesh;

@@ -4,6 +4,8 @@ import type { Settings } from '@/state/store';
 import { KEY_LABELS, REBINDABLE, keyName, boundKey } from '@/core/input';
 import type { Action } from '@/core/input';
 import { STATIC_BUILD } from '@/core/env';
+import { voice } from '@/core/voice';
+import { VOICE_PROFILES } from '@/data/voices';
 
 function Slider({ k, label }: { k: keyof Settings; label: string }) {
   const v = useSettings((s) => s[k]) as number;
@@ -25,6 +27,28 @@ export function SettingsPanel() {
       <Slider k="music" label="Музыка" />
       <Slider k="sfx" label="Эффекты" />
       <Slider k="ambient" label="Атмосфера (дождь, ветер, голоса)" />
+      <VoiceSettings />
+      <div className="divider">Камера</div>
+      <div className="setting-row">
+        <div>Вид<div className="faint" style={{ fontSize: 13 }}>Клавиша {boundKey('view')} переключает вид прямо в игре.</div></div>
+        <div className="seg">
+          {(['first', 'third', 'iso'] as const).map((m) => (
+            <button key={m} className={s.camera === m ? 'on' : ''} onClick={() => setSettings({ camera: m })}>{{ first: 'От первого лица', third: 'Из-за плеча', iso: 'Сверху' }[m]}</button>
+          ))}
+        </div>
+      </div>
+      <div className="setting-row">
+        <div>Чувствительность мыши</div>
+        <input id="set-sens" type="range" min={0.2} max={2.5} step={0.05} value={s.sensitivity} onChange={(e) => setSettings({ sensitivity: Number(e.target.value) })} />
+      </div>
+      <div className="setting-row">
+        <div>Поле зрения от первого лица<div className="faint" style={{ fontSize: 13 }}>{s.fov}°</div></div>
+        <input id="set-fov" type="range" min={55} max={100} step={1} value={s.fov} onChange={(e) => setSettings({ fov: Number(e.target.value) })} />
+      </div>
+      <div className="setting-row">
+        <div>Инвертировать мышь по вертикали</div>
+        <div className="seg"><button className={s.invertY ? 'on' : ''} onClick={() => setSettings({ invertY: true })}>Вкл</button><button className={!s.invertY ? 'on' : ''} onClick={() => setSettings({ invertY: false })}>Выкл</button></div>
+      </div>
       <div className="divider">Графика</div>
       <div className="setting-row">
         <div>Качество<div className="faint" style={{ fontSize: 13 }}>Высокое — тени 2048 и свечение в полном разрешении. Низкое — для слабых устройств.</div></div>
@@ -124,5 +148,42 @@ function KeyBindings() {
         <span className="faint" style={{ fontSize: 13 }}>Стрелки всегда дублируют движение. Сейчас взаимодействие: {boundKey('interact')}</span>
       </div>
     </div>
+  );
+}
+
+// Озвучка: голоса браузера, громкость, темп и поведение разговора.
+function VoiceSettings() {
+  const s = useSettings();
+  const [, force] = useState(0);
+  useEffect(() => voice.onChange(() => force((x) => x + 1)), []);
+  const onOff = (k: 'voice' | 'voiceHero' | 'voiceBarks' | 'autoAdvance') => (
+    <div className="seg"><button className={s[k] ? 'on' : ''} onClick={() => setSettings({ [k]: true })}>Вкл</button><button className={!s[k] ? 'on' : ''} onClick={() => setSettings({ [k]: false })}>Выкл</button></div>
+  );
+  const test = () => {
+    voice.speak('Добро пожаловать в Этермур. Свечи уже зажжены.', VOICE_PROFILES.veist, 'veist', { volume: s.voiceVolume, rate: s.voiceRate });
+    voice.speak('Ты тоже первокурсница? Пойдём, церемония вот-вот начнётся!', VOICE_PROFILES.mira, 'mira', { volume: s.voiceVolume, rate: s.voiceRate, queue: true });
+  };
+  return (
+    <>
+      <div className="divider">Озвучка</div>
+      {!voice.supported && <div className="dim" style={{ fontSize: 14, marginBottom: 8 }}>Этот браузер не умеет синтезировать речь. Реплики будут показаны текстом.</div>}
+      {voice.supported && !voice.available && (
+        <div className="dim" style={{ fontSize: 14, marginBottom: 8, lineHeight: 1.5 }}>Русских голосов в системе не найдено, поэтому реплики показаны текстом. Голоса есть в Chrome и Edge, а также в системах Windows, macOS и Android с русским языковым пакетом.</div>
+      )}
+      {voice.available && <div className="faint" style={{ fontSize: 13, marginBottom: 6 }}>Голосов найдено: {voice.voices.length} ({voice.voices.map((v) => v.name.replace(/Microsoft |Google | Online \(Natural\)| - Russian.*$/g, '')).join(', ')}). Каждый персонаж говорит своим голосом, высотой и темпом.</div>}
+      <div className="setting-row"><div>Персонажи говорят вслух</div>{onOff('voice')}</div>
+      <div className="setting-row">
+        <div>Громкость голосов</div>
+        <input id="set-voice-vol" type="range" min={0} max={1} step={0.05} value={s.voiceVolume} onChange={(e) => setSettings({ voiceVolume: Number(e.target.value) })} />
+      </div>
+      <div className="setting-row">
+        <div>Темп речи<div className="faint" style={{ fontSize: 13 }}>×{s.voiceRate.toFixed(2)}</div></div>
+        <input id="set-voice-rate" type="range" min={0.7} max={1.5} step={0.05} value={s.voiceRate} onChange={(e) => setSettings({ voiceRate: Number(e.target.value) })} />
+      </div>
+      <div className="setting-row"><div>Герой произносит выбранные ответы</div>{onOff('voiceHero')}</div>
+      <div className="setting-row"><div>Прохожие говорят вслух</div>{onOff('voiceBarks')}</div>
+      <div className="setting-row"><div>Разговор продолжается сам после реплики<div className="faint" style={{ fontSize: 13 }}>Читать не нужно — достаточно слушать и выбирать ответы.</div></div>{onOff('autoAdvance')}</div>
+      {voice.available && <div className="setting-row"><div>Проверить голоса</div><button className="btn small" onClick={test}>Послушать</button></div>}
+    </>
   );
 }

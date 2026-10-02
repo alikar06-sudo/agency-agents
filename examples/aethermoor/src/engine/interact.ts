@@ -728,12 +728,18 @@ export class InteractManager {
     }
   }
 
-  nearest(x: number, z: number, r: number): { item: Interactable; dist: number } | null {
+  nearest(x: number, z: number, r: number, dir?: { x: number; z: number }): { item: Interactable; dist: number } | null {
     let best: Interactable | null = null;
     let bd = r;
     for (const it of this.items) {
       if (!it.active || !it.obj.visible || it.kind === 'exit') continue;
-      const d = Math.hypot(it.x - x, it.z - z) - (['station', 'board', 'seal', 'bed', 'door', 'gate', 'block'].includes(it.kind) ? 0.9 : 0);
+      const raw = Math.hypot(it.x - x, it.z - z);
+      let d = raw - (['station', 'board', 'seal', 'bed', 'door', 'gate', 'block'].includes(it.kind) ? 0.9 : 0);
+      if (dir && raw > 0.7) {
+        const cos = ((it.x - x) * dir.x + (it.z - z) * dir.z) / raw;
+        if (cos < 0.3) continue;
+        d *= 1 + (1 - cos) * 1.2;
+      }
       if (d < bd && it.prompt()) { bd = d; best = it; }
     }
     return best ? { item: best, dist: bd } : null;

@@ -82,6 +82,7 @@ export interface UIState {
   waitMenu: boolean;
   fastTravel: boolean;
   cloud: 'unknown' | 'online' | 'offline';
+  lookLocked: boolean;                 // мышь захвачена для обзора
   hint: string | null;
   challenge: { title: string; goal: string; left: number } | null;
   ending: string | null;
@@ -103,6 +104,7 @@ export const useUI = create<UIState>(() => ({
   cinematic: null,
   read: null,
   fade: false,
+  lookLocked: false,
   dead: false,
   waitMenu: false,
   fastTravel: false,
@@ -153,6 +155,16 @@ export interface Settings {
   shake: boolean;
   minimapRotate: boolean;
   keys: Partial<Record<string, string>>;   // переназначенные клавиши: действие → код клавиши
+  camera: 'iso' | 'third' | 'first';       // вид: сверху, из-за плеча, от первого лица
+  sensitivity: number;                     // чувствительность обзора мышью
+  invertY: boolean;
+  fov: number;                             // поле зрения от первого лица, градусы
+  voice: boolean;          // озвучка реплик
+  voiceVolume: number;
+  voiceRate: number;
+  voiceHero: boolean;      // герой произносит выбранные ответы вслух
+  voiceBarks: boolean;     // прохожие произносят свои фразы
+  autoAdvance: boolean;    // после озвученной реплики разговор продолжается сам
 }
 
 const SETTINGS_KEY = 'aethermoor.settings.v1';
@@ -161,6 +173,8 @@ function loadSettings(): Settings {
   const def: Settings = {
     master: 0.8, music: 0.55, sfx: 0.8, ambient: 0.6, quality: 'medium', showDamage: true,
     textSpeed: 60, zoom: 1, touch: 'auto', shake: true, minimapRotate: false, keys: {},
+    camera: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'third' : 'first', sensitivity: 1, invertY: false, fov: 75,
+    voice: true, voiceVolume: 1, voiceRate: 1, voiceHero: true, voiceBarks: true, autoAdvance: true,
   };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);

@@ -1,6 +1,8 @@
 // NPC в мире: следуют расписанию, ходят по зонам, реагируют на героя, показывают значки заданий.
 import type { Engine } from './Engine';
 import { buildCharacter, animateCharacter } from './models';
+import { voice } from '@/core/voice';
+import { VOICE_PROFILES } from '@/data/voices';
 import type { CharacterRig } from './models';
 import { NPCS } from '@/data/npcs';
 import type { NpcDef } from '@/data/types';
@@ -8,10 +10,10 @@ import { npcLocation } from '@/systems/schedule';
 import type { NpcLocation } from '@/systems/schedule';
 import { findPath, moveCircle } from './physics';
 import { bus } from '@/core/bus';
-import { G, toast } from '@/state/store';
+import { G, toast, ui, useSettings } from '@/state/store';
 import { talkTo, pickDialogue } from '@/systems/dialogue';
 import { activeObjectives } from '@/systems/quests';
-import { checkAll } from '@/systems/logic';
+import { checkAll, fmt } from '@/systems/logic';
 
 export class NpcEntity {
   rig: CharacterRig;
@@ -93,6 +95,10 @@ export class NpcEntity {
         this.barkNext = this.eng.now + 25 + Math.random() * 20;
         this.bark = this.def.barks[Math.floor(Math.random() * this.def.barks.length)];
         this.barkUntil = this.eng.now + 4;
+        const st = useSettings.getState();
+        if (st.voice && st.voiceBarks && voice.available && !voice.speaking && !ui().dialogue) {
+          voice.speak(fmt(this.bark), VOICE_PROFILES[this.def.id] ?? VOICE_PROFILES.narrator, this.def.id, { volume: st.voiceVolume * (this.dist < 3 ? 0.75 : 0.5), rate: st.voiceRate });
+        }
       }
     }
     this.moving += ((speed > 0 ? 1 : 0) - this.moving) * Math.min(1, dt * 8);
@@ -209,12 +215,18 @@ export class NpcManager {
 
   animateIdle(dt: number): void { for (const n of this.list) { n.t += dt; n.animate(dt); } }
 
-  nearest(x: number, z: number, r: number): NpcEntity | null {
+  // dir — направление взгляда (в режимах обзора выбираем того, на кого смотрим)
+  nearest(x: number, z: number, r: number, dir?: { x: number; z: number }): NpcEntity | null {
     let best: NpcEntity | null = null;
     let bd = r;
     for (const n of this.list) {
       if (n.leaving) continue;
-      const d = Math.hypot(n.x - x, n.z - z);
+      let d = Math.hypot(n.x - x, n.z - z);
+      if (dir && d > 0.6) {
+        const cos = ((n.x - x) * dir.x + (n.z - z) * dir.z) / d;
+        if (cos < 0.35) continue;
+        d *= 1 + (1 - cos) * 1.2;
+      }
       if (d < bd) { bd = d; best = n; }
     }
     if (best) best.dist = bd;

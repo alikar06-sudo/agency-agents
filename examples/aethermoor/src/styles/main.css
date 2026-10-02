@@ -493,3 +493,11 @@ input { font-family: inherit; }
 .keybind .btn { min-width: 74px; }
 .keybind.wait .btn { border-color: var(--gold); color: var(--gold-2); animation: pulse 1s infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 12px rgba(227, 196, 107, 0.45); } }
+
+/* ---------- обзор от первого лица / из-за плеча ---------- */
+.crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; z-index: 6; }
+.crosshair::before { content: ''; position: absolute; left: 9px; top: 9px; width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 240, 200, 0.9); box-shadow: 0 0 6px rgba(0, 0, 0, 0.8); }
+.crosshair::after { content: ''; position: absolute; inset: 2px; border-radius: 50%; border: 1.5px solid rgba(227, 196, 107, 0.45); transition: transform 0.15s, border-color 0.15s; }
+.crosshair.on::after { transform: scale(1.25); border-color: rgba(255, 220, 140, 0.95); }
+.look-hint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: rgba(10, 8, 14, 0.72); border: 1px solid var(--line); color: var(--text); font-size: 15px; pointer-events: none; white-space: nowrap; z-index: 6; animation: fadeIn 0.6s; }
+@media (max-width: 600px) { .look-hint { white-space: normal; width: 80vw; text-align: center; } }

@@ -1,6 +1,6 @@
-import { boundKey } from '@/core/input';
+import { boundKey, input } from '@/core/input';
 import { useEffect, useRef, useState } from 'react';
-import { useGame, useUI, setUI, G } from '@/state/store';
+import { useGame, useUI, setUI, G, useSettings, isModalOpen } from '@/state/store';
 import { derived, xpToNext } from '@/systems/player';
 import { SPELLS } from '@/data/spells';
 import { ITEMS } from '@/data/items';
@@ -214,11 +214,33 @@ function HurtVignette() {
   return <div className="hurt-vignette" style={{ opacity: v ? 0.9 : low ? 0.45 : 0 }} />;
 }
 
+// Прицел и подсказка захвата мыши в режимах обзора от первого лица / из-за плеча.
+function LookOverlay() {
+  const mode = useSettings((s) => s.camera);
+  const locked = useUI((s) => s.lookLocked);
+  const modal = useUI((s) => isModalOpen(s));
+  const prompt = useUI((s) => s.prompt);
+  if (mode === 'iso' || modal) return null;
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return (
+    <>
+      <div className={'crosshair' + (prompt ? ' on' : '')} />
+      {!locked && !input.lockFailed && !coarse && (
+        <div className="look-hint">Щёлкните по экрану, чтобы осматриваться мышью · <span className="kbd">{boundKey('view')}</span> сменить вид</div>
+      )}
+      {!locked && input.lockFailed && !coarse && (
+        <div className="look-hint">Подведите курсор к краю экрана, чтобы повернуться, или используйте ← →</div>
+      )}
+    </>
+  );
+}
+
 export function HUD() {
   const zone = useGame((s) => s.g!.pos.zone);
   return (
     <div className="hud">
       <HurtVignette />
+      <LookOverlay />
       <Vitals />
       <div className="hud-tr">
         <Minimap />
